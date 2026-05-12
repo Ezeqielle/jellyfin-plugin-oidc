@@ -117,7 +117,7 @@
             <div id="tab-providers" class="oidc-tab-content active">
                 <div class="oidc-section">
                     <div class="oidc-actions" style="margin-bottom:1em;">
-                        <button class="oidc-btn oidc-btn-primary" onclick="OidcConfig.addProvider()">+ Add Provider</button>
+                        <button id="btnAddProvider" class="oidc-btn oidc-btn-primary">+ Add Provider</button>
                     </div>
                     <div id="providerList"></div>
                 </div>
@@ -127,7 +127,7 @@
             <div id="tab-roles" class="oidc-tab-content">
                 <div class="oidc-section">
                     <div class="oidc-actions" style="margin-bottom:1em;">
-                        <button class="oidc-btn oidc-btn-primary" onclick="OidcConfig.addRoleMapping()">+ Add Role Mapping</button>
+                        <button id="btnAddRoleMapping" class="oidc-btn oidc-btn-primary">+ Add Role Mapping</button>
                     </div>
                     <div id="roleMappingList"></div>
                 </div>
@@ -158,63 +158,112 @@
             </div>
 
             <div class="oidc-actions" style="margin-top:2em;">
-                <button class="oidc-btn oidc-btn-success" onclick="OidcConfig.save()">Save Configuration</button>
+                <button id="btnSave" class="oidc-btn oidc-btn-success">Save Configuration</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-var OidcConfig = (function() {
+<script type="text/javascript">
+(function() {
+    'use strict';
+
     var pluginId = 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90';
     var config = null;
     var libraries = {};
+    var page = document.querySelector('#OidcConfigPage');
 
     function init() {
-        document.querySelectorAll('.oidc-tab').forEach(function(tab) {
+        bindStaticEvents();
+        loadLibraries().then(loadConfig).catch(function(err) {
+            showStatus('Failed to load configuration: ' + (err.message || err), true);
+        });
+    }
+
+    function bindStaticEvents() {
+        page.querySelectorAll('.oidc-tab').forEach(function(tab) {
             tab.addEventListener('click', function() {
-                document.querySelectorAll('.oidc-tab').forEach(function(t) { t.classList.remove('active'); });
-                document.querySelectorAll('.oidc-tab-content').forEach(function(c) { c.classList.remove('active'); });
+                page.querySelectorAll('.oidc-tab').forEach(function(t) { t.classList.remove('active'); });
+                page.querySelectorAll('.oidc-tab-content').forEach(function(c) { c.classList.remove('active'); });
                 tab.classList.add('active');
-                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                page.querySelector('#tab-' + tab.dataset.tab).classList.add('active');
             });
         });
 
-        loadLibraries().then(loadConfig);
+        page.querySelector('#btnAddProvider').addEventListener('click', addProvider);
+        page.querySelector('#btnAddRoleMapping').addEventListener('click', addRoleMapping);
+        page.querySelector('#btnSave').addEventListener('click', save);
+
+        // Event delegation for dynamically created buttons
+        page.querySelector('#providerList').addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            var action = btn.dataset.action;
+            var idx = parseInt(btn.dataset.idx, 10);
+            if (action === 'remove-provider') {
+                config.Providers.splice(idx, 1);
+                renderProviders();
+            }
+        });
+
+        page.querySelector('#roleMappingList').addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            var action = btn.dataset.action;
+            var idx = parseInt(btn.dataset.idx, 10);
+            if (action === 'remove-role') {
+                config.RoleMappings.splice(idx, 1);
+                renderRoleMappings();
+            } else if (action === 'add-lib') {
+                addLibToRole(idx);
+            }
+        });
+
+        // Delegation for library chip removal
+        page.querySelector('#roleMappingList').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove')) {
+                e.target.parentElement.remove();
+            }
+        });
     }
 
     function loadLibraries() {
-        return ApiClient.fetch({
-            url: ApiClient.getUrl('sso/OIDC/Config/Libraries'),
-            type: 'GET',
-            dataType: 'json'
-        }).then(function(data) {
-            libraries = data;
-        }).catch(function() {
-            libraries = {};
+        return new Promise(function(resolve) {
+            ApiClient.fetch({
+                url: ApiClient.getUrl('sso/OIDC/Config/Libraries'),
+                type: 'GET',
+                dataType: 'json'
+            }).then(function(data) {
+                libraries = data || {};
+                resolve();
+            }).catch(function() {
+                libraries = {};
+                resolve();
+            });
         });
     }
 
     function loadConfig() {
-        ApiClient.getPluginConfiguration(pluginId).then(function(cfg) {
+        return ApiClient.getPluginConfiguration(pluginId).then(function(cfg) {
             config = cfg;
+            config.Providers = config.Providers || [];
+            config.RoleMappings = config.RoleMappings || [];
             renderProviders();
             renderRoleMappings();
-
-            document.getElementById('defaultProvider').value = config.DefaultProvider || '';
-            document.getElementById('defaultRoleName').value = config.DefaultRoleName || '';
-            document.getElementById('autoCreateUsers').checked = config.AutoCreateUsers !== false;
+            page.querySelector('#defaultProvider').value = config.DefaultProvider || '';
+            page.querySelector('#defaultRoleName').value = config.DefaultRoleName || '';
+            page.querySelector('#autoCreateUsers').checked = config.AutoCreateUsers !== false;
         });
     }
 
     function renderProviders() {
-        var container = document.getElementById('providerList');
+        var container = page.querySelector('#providerList');
         container.innerHTML = '';
 
-        (config.Providers || []).forEach(function(p, idx) {
+        config.Providers.forEach(function(p, idx) {
             var card = document.createElement('div');
             card.className = 'oidc-card';
-            card.innerHTML = '<h4>' + escapeHtml(p.DisplayName || 'New Provider') +
+            card.innerHTML = '<h4>' + esc(p.DisplayName || 'New Provider') +
                 (p.Enabled ? ' <span style="color:#4caf50">&#9679;</span>' : ' <span style="color:#888">&#9679;</span>') +
                 '</h4>' +
                 '<div class="oidc-grid">' +
@@ -233,22 +282,22 @@ var OidcConfig = (function() {
                 (p.Enabled !== false ? ' checked' : '') + '/> Enabled</label></div>' +
                 '</div>' +
                 '<div class="oidc-actions">' +
-                '<button class="oidc-btn oidc-btn-danger" onclick="OidcConfig.removeProvider(' + idx + ')">Remove</button>' +
+                '<button class="oidc-btn oidc-btn-danger" data-action="remove-provider" data-idx="' + idx + '">Remove</button>' +
                 '</div>';
             container.appendChild(card);
         });
     }
 
     function renderRoleMappings() {
-        var container = document.getElementById('roleMappingList');
+        var container = page.querySelector('#roleMappingList');
         container.innerHTML = '';
 
-        (config.RoleMappings || []).forEach(function(m, idx) {
+        config.RoleMappings.forEach(function(m, idx) {
             var card = document.createElement('div');
             card.className = 'oidc-card';
 
             var libOptions = Object.keys(libraries).map(function(id) {
-                return '<option value="' + escapeHtml(id) + '">' + escapeHtml(libraries[id]) + '</option>';
+                return '<option value="' + esc(id) + '">' + esc(libraries[id]) + '</option>';
             }).join('');
 
             var selectedLibs = (m.LibraryIds || []).concat(
@@ -260,28 +309,28 @@ var OidcConfig = (function() {
                 })
             );
 
-            card.innerHTML = '<h4>Role: ' + escapeHtml(m.RoleName || 'New Role') + '</h4>' +
+            card.innerHTML = '<h4>Role: ' + esc(m.RoleName || 'New Role') + '</h4>' +
                 '<div class="oidc-grid">' +
                 field('Role Name', 'text', 'role_name_' + idx, m.RoleName, 'Must match IdP role claim value') +
                 field('Priority', 'number', 'role_priority_' + idx, m.Priority || 0, 'Higher = takes precedence') +
                 '</div>' +
                 '<div class="oidc-checkbox-row">' +
-                checkbox('role_admin_' + idx, 'Administrator', m.IsAdmin) +
-                checkbox('role_alllibs_' + idx, 'All Libraries', m.EnableAllLibraries) +
-                checkbox('role_livetv_' + idx, 'Live TV', m.EnableLiveTv) +
-                checkbox('role_livetvmgmt_' + idx, 'Live TV Mgmt', m.EnableLiveTvManagement) +
-                checkbox('role_playback_' + idx, 'Playback', m.EnableMediaPlayback !== false) +
-                checkbox('role_remote_' + idx, 'Remote Access', m.EnableRemoteAccess !== false) +
-                checkbox('role_transcode_' + idx, 'Transcoding', m.EnableTranscoding !== false) +
-                checkbox('role_delete_' + idx, 'Delete Content', m.EnableContentDeletion) +
-                checkbox('role_collections_' + idx, 'Collections', m.EnableCollectionManagement) +
-                checkbox('role_subtitles_' + idx, 'Subtitles', m.EnableSubtitleManagement) +
+                chk('role_admin_' + idx, 'Administrator', m.IsAdmin) +
+                chk('role_alllibs_' + idx, 'All Libraries', m.EnableAllLibraries) +
+                chk('role_livetv_' + idx, 'Live TV', m.EnableLiveTv) +
+                chk('role_livetvmgmt_' + idx, 'Live TV Mgmt', m.EnableLiveTvManagement) +
+                chk('role_playback_' + idx, 'Playback', m.EnableMediaPlayback !== false) +
+                chk('role_remote_' + idx, 'Remote Access', m.EnableRemoteAccess !== false) +
+                chk('role_transcode_' + idx, 'Transcoding', m.EnableTranscoding !== false) +
+                chk('role_delete_' + idx, 'Delete Content', m.EnableContentDeletion) +
+                chk('role_collections_' + idx, 'Collections', m.EnableCollectionManagement) +
+                chk('role_subtitles_' + idx, 'Subtitles', m.EnableSubtitleManagement) +
                 '</div>' +
                 '<div class="oidc-field" style="margin-top:0.5em;">' +
                 '<label>Libraries (when "All Libraries" is unchecked)</label>' +
                 '<select id="role_libadd_' + idx + '"><option value="">-- Select library --</option>' + libOptions + '</select>' +
                 '<button class="oidc-btn oidc-btn-secondary" style="margin-top:0.3em;width:fit-content;" ' +
-                'onclick="OidcConfig.addLibToRole(' + idx + ')">Add Library</button>' +
+                'data-action="add-lib" data-idx="' + idx + '">Add Library</button>' +
                 '<div id="role_libs_' + idx + '" class="oidc-library-list"></div>' +
                 '</div>' +
                 '<div class="oidc-field" style="margin-top:0.5em;">' +
@@ -289,50 +338,103 @@ var OidcConfig = (function() {
                 '<input type="number" id="role_maxrating_' + idx + '" value="' + (m.MaxParentalRating != null ? m.MaxParentalRating : '') + '" />' +
                 '</div>' +
                 '<div class="oidc-actions">' +
-                '<button class="oidc-btn oidc-btn-danger" onclick="OidcConfig.removeRoleMapping(' + idx + ')">Remove</button>' +
+                '<button class="oidc-btn oidc-btn-danger" data-action="remove-role" data-idx="' + idx + '">Remove</button>' +
                 '</div>';
 
             container.appendChild(card);
 
-            // Render selected libraries
-            var libContainer = document.getElementById('role_libs_' + idx);
+            var libContainer = page.querySelector('#role_libs_' + idx);
             selectedLibs.forEach(function(libId) {
-                addLibChip(libContainer, libId, idx);
+                addLibChip(libContainer, libId);
             });
         });
     }
 
-    function addLibChip(container, libId, roleIdx) {
+    function addProvider() {
+        if (!config) return;
+        config.Providers.push({
+            ProviderId: '',
+            DisplayName: 'New Provider',
+            Authority: '',
+            ClientId: '',
+            ClientSecret: '',
+            Scopes: 'openid profile email',
+            RoleClaim: 'realm_access.roles',
+            UsernameClaim: 'preferred_username',
+            DisplayNameClaim: 'name',
+            Enabled: true,
+            ButtonColor: '#4285F4',
+            ButtonIcon: '',
+            AdditionalParameters: ''
+        });
+        renderProviders();
+    }
+
+    function addRoleMapping() {
+        if (!config) return;
+        config.RoleMappings.push({
+            RoleName: '',
+            Priority: 0,
+            IsAdmin: false,
+            EnableAllLibraries: false,
+            LibraryIds: [],
+            LibraryNames: [],
+            EnableLiveTv: false,
+            EnableLiveTvManagement: false,
+            EnableMediaPlayback: true,
+            EnableRemoteAccess: true,
+            EnableTranscoding: true,
+            EnableContentDeletion: false,
+            EnableCollectionManagement: false,
+            EnableSubtitleManagement: false,
+            MaxParentalRating: null
+        });
+        renderRoleMappings();
+    }
+
+    function addLibToRole(roleIdx) {
+        var select = page.querySelector('#role_libadd_' + roleIdx);
+        var libId = select.value;
+        if (!libId) return;
+
+        var container = page.querySelector('#role_libs_' + roleIdx);
+        var existing = container.querySelectorAll('.oidc-library-chip');
+        for (var i = 0; i < existing.length; i++) {
+            if (existing[i].dataset.libId === libId) return;
+        }
+
+        addLibChip(container, libId);
+        select.value = '';
+    }
+
+    function addLibChip(container, libId) {
         var chip = document.createElement('span');
         chip.className = 'oidc-library-chip';
         chip.dataset.libId = libId;
-        chip.innerHTML = escapeHtml(libraries[libId] || libId) +
-            ' <span class="remove" onclick="this.parentElement.remove()">&times;</span>';
+        chip.innerHTML = esc(libraries[libId] || libId) +
+            ' <span class="remove">&times;</span>';
         container.appendChild(chip);
     }
 
-    function field(label, type, id, value, placeholder, full) {
-        return '<div class="oidc-field' + (full ? ' full' : '') + '">' +
-            '<label for="' + id + '">' + escapeHtml(label) + '</label>' +
-            '<input type="' + type + '" id="' + id + '" value="' + escapeHtml(String(value || '')) + '"' +
-            (placeholder ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + ' />' +
-            '</div>';
-    }
+    function save() {
+        if (!config) return;
 
-    function checkbox(id, label, checked) {
-        return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + ' /> ' +
-            escapeHtml(label) + '</label>';
-    }
+        config.Providers = collectProviders();
+        config.RoleMappings = collectRoleMappings();
+        config.DefaultProvider = val('defaultProvider');
+        config.DefaultRoleName = val('defaultRoleName');
+        config.AutoCreateUsers = isChecked('autoCreateUsers');
 
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+            showStatus('Configuration saved successfully!', false);
+        }).catch(function(err) {
+            showStatus('Failed to save: ' + (err.message || err), true);
+        });
     }
 
     function collectProviders() {
         var providers = [];
-        var cards = document.querySelectorAll('#providerList .oidc-card');
+        var cards = page.querySelectorAll('#providerList .oidc-card');
         cards.forEach(function(card, idx) {
             providers.push({
                 ProviderId: val('prov_id_' + idx),
@@ -346,7 +448,7 @@ var OidcConfig = (function() {
                 DisplayNameClaim: val('prov_displayclaim_' + idx),
                 ButtonColor: val('prov_color_' + idx),
                 AdditionalParameters: val('prov_params_' + idx),
-                Enabled: checked('prov_enabled_' + idx),
+                Enabled: isChecked('prov_enabled_' + idx),
                 ButtonIcon: ''
             });
         });
@@ -355,9 +457,9 @@ var OidcConfig = (function() {
 
     function collectRoleMappings() {
         var mappings = [];
-        var cards = document.querySelectorAll('#roleMappingList .oidc-card');
+        var cards = page.querySelectorAll('#roleMappingList .oidc-card');
         cards.forEach(function(card, idx) {
-            var libChips = document.querySelectorAll('#role_libs_' + idx + ' .oidc-library-chip');
+            var libChips = page.querySelectorAll('#role_libs_' + idx + ' .oidc-library-chip');
             var libIds = [];
             libChips.forEach(function(chip) { libIds.push(chip.dataset.libId); });
 
@@ -366,129 +468,70 @@ var OidcConfig = (function() {
             mappings.push({
                 RoleName: val('role_name_' + idx),
                 Priority: parseInt(val('role_priority_' + idx)) || 0,
-                IsAdmin: checked('role_admin_' + idx),
-                EnableAllLibraries: checked('role_alllibs_' + idx),
+                IsAdmin: isChecked('role_admin_' + idx),
+                EnableAllLibraries: isChecked('role_alllibs_' + idx),
                 LibraryIds: libIds,
                 LibraryNames: [],
-                EnableLiveTv: checked('role_livetv_' + idx),
-                EnableLiveTvManagement: checked('role_livetvmgmt_' + idx),
-                EnableMediaPlayback: checked('role_playback_' + idx),
-                EnableRemoteAccess: checked('role_remote_' + idx),
-                EnableTranscoding: checked('role_transcode_' + idx),
-                EnableContentDeletion: checked('role_delete_' + idx),
-                EnableCollectionManagement: checked('role_collections_' + idx),
-                EnableSubtitleManagement: checked('role_subtitles_' + idx),
+                EnableLiveTv: isChecked('role_livetv_' + idx),
+                EnableLiveTvManagement: isChecked('role_livetvmgmt_' + idx),
+                EnableMediaPlayback: isChecked('role_playback_' + idx),
+                EnableRemoteAccess: isChecked('role_remote_' + idx),
+                EnableTranscoding: isChecked('role_transcode_' + idx),
+                EnableContentDeletion: isChecked('role_delete_' + idx),
+                EnableCollectionManagement: isChecked('role_collections_' + idx),
+                EnableSubtitleManagement: isChecked('role_subtitles_' + idx),
                 MaxParentalRating: maxRating ? parseInt(maxRating) : null
             });
         });
         return mappings;
     }
 
+    function field(label, type, id, value, placeholder, full) {
+        return '<div class="oidc-field' + (full ? ' full' : '') + '">' +
+            '<label for="' + id + '">' + esc(label) + '</label>' +
+            '<input type="' + type + '" id="' + id + '" value="' + esc(String(value || '')) + '"' +
+            (placeholder ? ' placeholder="' + esc(placeholder) + '"' : '') + ' />' +
+            '</div>';
+    }
+
+    function chk(id, label, checked) {
+        return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + ' /> ' +
+            esc(label) + '</label>';
+    }
+
+    function esc(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     function val(id) {
-        var el = document.getElementById(id);
+        var el = page.querySelector('#' + id);
         return el ? el.value : '';
     }
 
-    function checked(id) {
-        var el = document.getElementById(id);
+    function isChecked(id) {
+        var el = page.querySelector('#' + id);
         return el ? el.checked : false;
     }
 
     function showStatus(msg, isError) {
-        var el = document.getElementById('statusMessage');
+        var el = page.querySelector('#statusMessage');
         el.textContent = msg;
         el.className = 'oidc-status ' + (isError ? 'error' : 'success');
         setTimeout(function() { el.className = 'oidc-status'; }, 4000);
     }
 
-    return {
-        init: init,
-
-        addProvider: function() {
-            config.Providers = config.Providers || [];
-            config.Providers.push({
-                ProviderId: '',
-                DisplayName: 'New Provider',
-                Authority: '',
-                ClientId: '',
-                ClientSecret: '',
-                Scopes: 'openid profile email',
-                RoleClaim: 'realm_access.roles',
-                UsernameClaim: 'preferred_username',
-                DisplayNameClaim: 'name',
-                Enabled: true,
-                ButtonColor: '#4285F4',
-                ButtonIcon: '',
-                AdditionalParameters: ''
-            });
-            renderProviders();
-        },
-
-        removeProvider: function(idx) {
-            config.Providers.splice(idx, 1);
-            renderProviders();
-        },
-
-        addRoleMapping: function() {
-            config.RoleMappings = config.RoleMappings || [];
-            config.RoleMappings.push({
-                RoleName: '',
-                Priority: 0,
-                IsAdmin: false,
-                EnableAllLibraries: false,
-                LibraryIds: [],
-                LibraryNames: [],
-                EnableLiveTv: false,
-                EnableLiveTvManagement: false,
-                EnableMediaPlayback: true,
-                EnableRemoteAccess: true,
-                EnableTranscoding: true,
-                EnableContentDeletion: false,
-                EnableCollectionManagement: false,
-                EnableSubtitleManagement: false,
-                MaxParentalRating: null
-            });
-            renderRoleMappings();
-        },
-
-        removeRoleMapping: function(idx) {
-            config.RoleMappings.splice(idx, 1);
-            renderRoleMappings();
-        },
-
-        addLibToRole: function(roleIdx) {
-            var select = document.getElementById('role_libadd_' + roleIdx);
-            var libId = select.value;
-            if (!libId) return;
-
-            var container = document.getElementById('role_libs_' + roleIdx);
-            var existing = container.querySelectorAll('.oidc-library-chip');
-            for (var i = 0; i < existing.length; i++) {
-                if (existing[i].dataset.libId === libId) return;
-            }
-
-            addLibChip(container, libId, roleIdx);
-            select.value = '';
-        },
-
-        save: function() {
-            config.Providers = collectProviders();
-            config.RoleMappings = collectRoleMappings();
-            config.DefaultProvider = val('defaultProvider');
-            config.DefaultRoleName = val('defaultRoleName');
-            config.AutoCreateUsers = checked('autoCreateUsers');
-
-            ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
-                showStatus('Configuration saved successfully!', false);
-            }).catch(function(err) {
-                showStatus('Failed to save: ' + (err.message || err), true);
-            });
-        }
-    };
+    // Jellyfin fires 'pageshow' on the page element for SPA navigation
+    page.addEventListener('pageshow', init);
+    page.addEventListener('viewshow', init);
+    // Fallback for direct page load
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(init, 0);
+    } else {
+        document.addEventListener('DOMContentLoaded', init);
+    }
 })();
-
-document.addEventListener('viewshow', function() { OidcConfig.init(); });
-window.addEventListener('load', function() { OidcConfig.init(); });
 </script>
 </div>
 </body>
