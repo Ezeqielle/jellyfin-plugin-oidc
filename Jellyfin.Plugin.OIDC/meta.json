@@ -1,0 +1,18 @@
+{
+  "guid": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
+  "name": "OIDC RBAC",
+  "description": "Advanced OIDC authentication with role-based library access control",
+  "overview": "OpenID Connect SSO with granular role-to-library mapping, multi-provider support, and a full admin configuration UI.",
+  "owner": "Ezeqielle",
+  "category": "Authentication",
+  "versions": [
+    {
+      "version": "1.0.0.0",
+      "changelog": "Initial release: OIDC auth with PKCE, role-based library access, multi-provider, admin UI",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-05-12T00:00:00Z"
+    }
+  ],
+  "status": "Active"
+}

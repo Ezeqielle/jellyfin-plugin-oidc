@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OIDC RBAC</title>
+    <style>
+        .oidc-section { margin-bottom: 2em; }
+        .oidc-card {
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1em;
+            margin-bottom: 1em;
+            background: rgba(255,255,255,0.03);
+        }
+        .oidc-card h4 { margin-top: 0; }
+        .oidc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8em;
+        }
+        .oidc-field { display: flex; flex-direction: column; gap: 0.3em; }
+        .oidc-field label { font-weight: 600; font-size: 0.9em; }
+        .oidc-field input, .oidc-field select { padding: 0.4em; }
+        .oidc-field.full { grid-column: 1 / -1; }
+        .oidc-actions { margin-top: 0.5em; display: flex; gap: 0.5em; }
+        .oidc-btn {
+            padding: 0.5em 1.2em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .oidc-btn-primary { background: #00a4dc; color: #fff; }
+        .oidc-btn-danger { background: #c62828; color: #fff; }
+        .oidc-btn-success { background: #2e7d32; color: #fff; }
+        .oidc-btn-secondary { background: #555; color: #fff; }
+        .oidc-checkbox-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1em;
+            margin: 0.5em 0;
+        }
+        .oidc-checkbox-row label {
+            display: flex;
+            align-items: center;
+            gap: 0.3em;
+            font-weight: normal;
+        }
+        .oidc-library-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5em;
+            margin-top: 0.3em;
+        }
+        .oidc-library-chip {
+            background: #00a4dc33;
+            border: 1px solid #00a4dc;
+            border-radius: 4px;
+            padding: 0.2em 0.6em;
+            display: flex;
+            align-items: center;
+            gap: 0.3em;
+        }
+        .oidc-library-chip .remove {
+            cursor: pointer;
+            font-weight: bold;
+            color: #c62828;
+        }
+        .oidc-status {
+            padding: 0.5em 1em;
+            border-radius: 4px;
+            margin-bottom: 1em;
+            display: none;
+        }
+        .oidc-status.success { display: block; background: #1b5e20; color: #fff; }
+        .oidc-status.error { display: block; background: #b71c1c; color: #fff; }
+        .oidc-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5em;
+            border-bottom: 2px solid #444;
+        }
+        .oidc-tab {
+            padding: 0.6em 1.5em;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #aaa;
+            font-size: 1em;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .oidc-tab.active {
+            color: #00a4dc;
+            border-bottom-color: #00a4dc;
+        }
+        .oidc-tab-content { display: none; }
+        .oidc-tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+<div id="OidcConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox">
+
+    <div data-role="content">
+        <div class="content-primary">
+            <h2>OIDC RBAC Configuration</h2>
+
+            <div id="statusMessage" class="oidc-status"></div>
+
+            <div class="oidc-tabs">
+                <button class="oidc-tab active" data-tab="providers">Providers</button>
+                <button class="oidc-tab" data-tab="roles">Role Mappings</button>
+                <button class="oidc-tab" data-tab="general">General</button>
+            </div>
+
+            <!-- PROVIDERS TAB -->
+            <div id="tab-providers" class="oidc-tab-content active">
+                <div class="oidc-section">
+                    <div class="oidc-actions" style="margin-bottom:1em;">
+                        <button class="oidc-btn oidc-btn-primary" onclick="OidcConfig.addProvider()">+ Add Provider</button>
+                    </div>
+                    <div id="providerList"></div>
+                </div>
+            </div>
+
+            <!-- ROLE MAPPINGS TAB -->
+            <div id="tab-roles" class="oidc-tab-content">
+                <div class="oidc-section">
+                    <div class="oidc-actions" style="margin-bottom:1em;">
+                        <button class="oidc-btn oidc-btn-primary" onclick="OidcConfig.addRoleMapping()">+ Add Role Mapping</button>
+                    </div>
+                    <div id="roleMappingList"></div>
+                </div>
+            </div>
+
+            <!-- GENERAL TAB -->
+            <div id="tab-general" class="oidc-tab-content">
+                <div class="oidc-section">
+                    <div class="oidc-card">
+                        <div class="oidc-grid">
+                            <div class="oidc-field">
+                                <label>Default Provider ID</label>
+                                <input type="text" id="defaultProvider" placeholder="e.g. keycloak" />
+                            </div>
+                            <div class="oidc-field">
+                                <label>Default Role (fallback)</label>
+                                <input type="text" id="defaultRoleName" placeholder="e.g. viewer" />
+                            </div>
+                            <div class="oidc-field full">
+                                <label>
+                                    <input type="checkbox" id="autoCreateUsers" />
+                                    Auto-create users on first OIDC login
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="oidc-actions" style="margin-top:2em;">
+                <button class="oidc-btn oidc-btn-success" onclick="OidcConfig.save()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var OidcConfig = (function() {
+    var pluginId = 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90';
+    var config = null;
+    var libraries = {};
+
+    function init() {
+        document.querySelectorAll('.oidc-tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.oidc-tab').forEach(function(t) { t.classList.remove('active'); });
+                document.querySelectorAll('.oidc-tab-content').forEach(function(c) { c.classList.remove('active'); });
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        loadLibraries().then(loadConfig);
+    }
+
+    function loadLibraries() {
+        return ApiClient.fetch({
+            url: ApiClient.getUrl('sso/OIDC/Config/Libraries'),
+            type: 'GET',
+            dataType: 'json'
+        }).then(function(data) {
+            libraries = data;
+        }).catch(function() {
+            libraries = {};
+        });
+    }
+
+    function loadConfig() {
+        ApiClient.getPluginConfiguration(pluginId).then(function(cfg) {
+            config = cfg;
+            renderProviders();
+            renderRoleMappings();
+
+            document.getElementById('defaultProvider').value = config.DefaultProvider || '';
+            document.getElementById('defaultRoleName').value = config.DefaultRoleName || '';
+            document.getElementById('autoCreateUsers').checked = config.AutoCreateUsers !== false;
+        });
+    }
+
+    function renderProviders() {
+        var container = document.getElementById('providerList');
+        container.innerHTML = '';
+
+        (config.Providers || []).forEach(function(p, idx) {
+            var card = document.createElement('div');
+            card.className = 'oidc-card';
+            card.innerHTML = '<h4>' + escapeHtml(p.DisplayName || 'New Provider') +
+                (p.Enabled ? ' <span style="color:#4caf50">&#9679;</span>' : ' <span style="color:#888">&#9679;</span>') +
+                '</h4>' +
+                '<div class="oidc-grid">' +
+                field('Provider ID', 'text', 'prov_id_' + idx, p.ProviderId, 'Unique identifier (e.g. keycloak)') +
+                field('Display Name', 'text', 'prov_name_' + idx, p.DisplayName, 'Shown on login button') +
+                field('Authority URL', 'text', 'prov_authority_' + idx, p.Authority, 'https://idp.example.com/realms/myrealm', true) +
+                field('Client ID', 'text', 'prov_clientid_' + idx, p.ClientId, '') +
+                field('Client Secret', 'password', 'prov_secret_' + idx, p.ClientSecret, '') +
+                field('Scopes', 'text', 'prov_scopes_' + idx, p.Scopes || 'openid profile email', '') +
+                field('Role Claim Path', 'text', 'prov_roleclaim_' + idx, p.RoleClaim || 'realm_access.roles', 'e.g. realm_access.roles or groups') +
+                field('Username Claim', 'text', 'prov_userclaim_' + idx, p.UsernameClaim || 'preferred_username', '') +
+                field('Display Name Claim', 'text', 'prov_displayclaim_' + idx, p.DisplayNameClaim || 'name', '') +
+                field('Button Color', 'color', 'prov_color_' + idx, p.ButtonColor || '#4285F4', '') +
+                field('Additional Params', 'text', 'prov_params_' + idx, p.AdditionalParameters || '', 'key=val&key2=val2', true) +
+                '<div class="oidc-field"><label><input type="checkbox" id="prov_enabled_' + idx + '"' +
+                (p.Enabled !== false ? ' checked' : '') + '/> Enabled</label></div>' +
+                '</div>' +
+                '<div class="oidc-actions">' +
+                '<button class="oidc-btn oidc-btn-danger" onclick="OidcConfig.removeProvider(' + idx + ')">Remove</button>' +
+                '</div>';
+            container.appendChild(card);
+        });
+    }
+
+    function renderRoleMappings() {
+        var container = document.getElementById('roleMappingList');
+        container.innerHTML = '';
+
+        (config.RoleMappings || []).forEach(function(m, idx) {
+            var card = document.createElement('div');
+            card.className = 'oidc-card';
+
+            var libOptions = Object.keys(libraries).map(function(id) {
+                return '<option value="' + escapeHtml(id) + '">' + escapeHtml(libraries[id]) + '</option>';
+            }).join('');
+
+            var selectedLibs = (m.LibraryIds || []).concat(
+                (m.LibraryNames || []).map(function(name) {
+                    var found = Object.keys(libraries).find(function(id) {
+                        return libraries[id].toLowerCase() === name.toLowerCase();
+                    });
+                    return found || name;
+                })
+            );
+
+            card.innerHTML = '<h4>Role: ' + escapeHtml(m.RoleName || 'New Role') + '</h4>' +
+                '<div class="oidc-grid">' +
+                field('Role Name', 'text', 'role_name_' + idx, m.RoleName, 'Must match IdP role claim value') +
+                field('Priority', 'number', 'role_priority_' + idx, m.Priority || 0, 'Higher = takes precedence') +
+                '</div>' +
+                '<div class="oidc-checkbox-row">' +
+                checkbox('role_admin_' + idx, 'Administrator', m.IsAdmin) +
+                checkbox('role_alllibs_' + idx, 'All Libraries', m.EnableAllLibraries) +
+                checkbox('role_livetv_' + idx, 'Live TV', m.EnableLiveTv) +
+                checkbox('role_livetvmgmt_' + idx, 'Live TV Mgmt', m.EnableLiveTvManagement) +
+                checkbox('role_playback_' + idx, 'Playback', m.EnableMediaPlayback !== false) +
+                checkbox('role_remote_' + idx, 'Remote Access', m.EnableRemoteAccess !== false) +
+                checkbox('role_transcode_' + idx, 'Transcoding', m.EnableTranscoding !== false) +
+                checkbox('role_delete_' + idx, 'Delete Content', m.EnableContentDeletion) +
+                checkbox('role_collections_' + idx, 'Collections', m.EnableCollectionManagement) +
+                checkbox('role_subtitles_' + idx, 'Subtitles', m.EnableSubtitleManagement) +
+                '</div>' +
+                '<div class="oidc-field" style="margin-top:0.5em;">' +
+                '<label>Libraries (when "All Libraries" is unchecked)</label>' +
+                '<select id="role_libadd_' + idx + '"><option value="">-- Select library --</option>' + libOptions + '</select>' +
+                '<button class="oidc-btn oidc-btn-secondary" style="margin-top:0.3em;width:fit-content;" ' +
+                'onclick="OidcConfig.addLibToRole(' + idx + ')">Add Library</button>' +
+                '<div id="role_libs_' + idx + '" class="oidc-library-list"></div>' +
+                '</div>' +
+                '<div class="oidc-field" style="margin-top:0.5em;">' +
+                '<label>Max Parental Rating (empty = unrestricted)</label>' +
+                '<input type="number" id="role_maxrating_' + idx + '" value="' + (m.MaxParentalRating != null ? m.MaxParentalRating : '') + '" />' +
+                '</div>' +
+                '<div class="oidc-actions">' +
+                '<button class="oidc-btn oidc-btn-danger" onclick="OidcConfig.removeRoleMapping(' + idx + ')">Remove</button>' +
+                '</div>';
+
+            container.appendChild(card);
+
+            // Render selected libraries
+            var libContainer = document.getElementById('role_libs_' + idx);
+            selectedLibs.forEach(function(libId) {
+                addLibChip(libContainer, libId, idx);
+            });
+        });
+    }
+
+    function addLibChip(container, libId, roleIdx) {
+        var chip = document.createElement('span');
+        chip.className = 'oidc-library-chip';
+        chip.dataset.libId = libId;
+        chip.innerHTML = escapeHtml(libraries[libId] || libId) +
+            ' <span class="remove" onclick="this.parentElement.remove()">&times;</span>';
+        container.appendChild(chip);
+    }
+
+    function field(label, type, id, value, placeholder, full) {
+        return '<div class="oidc-field' + (full ? ' full' : '') + '">' +
+            '<label for="' + id + '">' + escapeHtml(label) + '</label>' +
+            '<input type="' + type + '" id="' + id + '" value="' + escapeHtml(String(value || '')) + '"' +
+            (placeholder ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + ' />' +
+            '</div>';
+    }
+
+    function checkbox(id, label, checked) {
+        return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + ' /> ' +
+            escapeHtml(label) + '</label>';
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function collectProviders() {
+        var providers = [];
+        var cards = document.querySelectorAll('#providerList .oidc-card');
+        cards.forEach(function(card, idx) {
+            providers.push({
+                ProviderId: val('prov_id_' + idx),
+                DisplayName: val('prov_name_' + idx),
+                Authority: val('prov_authority_' + idx),
+                ClientId: val('prov_clientid_' + idx),
+                ClientSecret: val('prov_secret_' + idx),
+                Scopes: val('prov_scopes_' + idx),
+                RoleClaim: val('prov_roleclaim_' + idx),
+                UsernameClaim: val('prov_userclaim_' + idx),
+                DisplayNameClaim: val('prov_displayclaim_' + idx),
+                ButtonColor: val('prov_color_' + idx),
+                AdditionalParameters: val('prov_params_' + idx),
+                Enabled: checked('prov_enabled_' + idx),
+                ButtonIcon: ''
+            });
+        });
+        return providers;
+    }
+
+    function collectRoleMappings() {
+        var mappings = [];
+        var cards = document.querySelectorAll('#roleMappingList .oidc-card');
+        cards.forEach(function(card, idx) {
+            var libChips = document.querySelectorAll('#role_libs_' + idx + ' .oidc-library-chip');
+            var libIds = [];
+            libChips.forEach(function(chip) { libIds.push(chip.dataset.libId); });
+
+            var maxRating = val('role_maxrating_' + idx);
+
+            mappings.push({
+                RoleName: val('role_name_' + idx),
+                Priority: parseInt(val('role_priority_' + idx)) || 0,
+                IsAdmin: checked('role_admin_' + idx),
+                EnableAllLibraries: checked('role_alllibs_' + idx),
+                LibraryIds: libIds,
+                LibraryNames: [],
+                EnableLiveTv: checked('role_livetv_' + idx),
+                EnableLiveTvManagement: checked('role_livetvmgmt_' + idx),
+                EnableMediaPlayback: checked('role_playback_' + idx),
+                EnableRemoteAccess: checked('role_remote_' + idx),
+                EnableTranscoding: checked('role_transcode_' + idx),
+                EnableContentDeletion: checked('role_delete_' + idx),
+                EnableCollectionManagement: checked('role_collections_' + idx),
+                EnableSubtitleManagement: checked('role_subtitles_' + idx),
+                MaxParentalRating: maxRating ? parseInt(maxRating) : null
+            });
+        });
+        return mappings;
+    }
+
+    function val(id) {
+        var el = document.getElementById(id);
+        return el ? el.value : '';
+    }
+
+    function checked(id) {
+        var el = document.getElementById(id);
+        return el ? el.checked : false;
+    }
+
+    function showStatus(msg, isError) {
+        var el = document.getElementById('statusMessage');
+        el.textContent = msg;
+        el.className = 'oidc-status ' + (isError ? 'error' : 'success');
+        setTimeout(function() { el.className = 'oidc-status'; }, 4000);
+    }
+
+    return {
+        init: init,
+
+        addProvider: function() {
+            config.Providers = config.Providers || [];
+            config.Providers.push({
+                ProviderId: '',
+                DisplayName: 'New Provider',
+                Authority: '',
+                ClientId: '',
+                ClientSecret: '',
+                Scopes: 'openid profile email',
+                RoleClaim: 'realm_access.roles',
+                UsernameClaim: 'preferred_username',
+                DisplayNameClaim: 'name',
+                Enabled: true,
+                ButtonColor: '#4285F4',
+                ButtonIcon: '',
+                AdditionalParameters: ''
+            });
+            renderProviders();
+        },
+
+        removeProvider: function(idx) {
+            config.Providers.splice(idx, 1);
+            renderProviders();
+        },
+
+        addRoleMapping: function() {
+            config.RoleMappings = config.RoleMappings || [];
+            config.RoleMappings.push({
+                RoleName: '',
+                Priority: 0,
+                IsAdmin: false,
+                EnableAllLibraries: false,
+                LibraryIds: [],
+                LibraryNames: [],
+                EnableLiveTv: false,
+                EnableLiveTvManagement: false,
+                EnableMediaPlayback: true,
+                EnableRemoteAccess: true,
+                EnableTranscoding: true,
+                EnableContentDeletion: false,
+                EnableCollectionManagement: false,
+                EnableSubtitleManagement: false,
+                MaxParentalRating: null
+            });
+            renderRoleMappings();
+        },
+
+        removeRoleMapping: function(idx) {
+            config.RoleMappings.splice(idx, 1);
+            renderRoleMappings();
+        },
+
+        addLibToRole: function(roleIdx) {
+            var select = document.getElementById('role_libadd_' + roleIdx);
+            var libId = select.value;
+            if (!libId) return;
+
+            var container = document.getElementById('role_libs_' + roleIdx);
+            var existing = container.querySelectorAll('.oidc-library-chip');
+            for (var i = 0; i < existing.length; i++) {
+                if (existing[i].dataset.libId === libId) return;
+            }
+
+            addLibChip(container, libId, roleIdx);
+            select.value = '';
+        },
+
+        save: function() {
+            config.Providers = collectProviders();
+            config.RoleMappings = collectRoleMappings();
+            config.DefaultProvider = val('defaultProvider');
+            config.DefaultRoleName = val('defaultRoleName');
+            config.AutoCreateUsers = checked('autoCreateUsers');
+
+            ApiClient.updatePluginConfiguration(pluginId, config).then(function() {
+                showStatus('Configuration saved successfully!', false);
+            }).catch(function(err) {
+                showStatus('Failed to save: ' + (err.message || err), true);
+            });
+        }
+    };
+})();
+
+document.addEventListener('viewshow', function() { OidcConfig.init(); });
+window.addEventListener('load', function() { OidcConfig.init(); });
+</script>
+</div>
+</body>
+</html>

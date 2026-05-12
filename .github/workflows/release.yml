@@ -1,0 +1,77 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: dotnet publish Jellyfin.Plugin.OIDC/Jellyfin.Plugin.OIDC.csproj -c Release -o dist
+
+      - name: Package
+        run: cd dist && zip ../oidc-rbac.zip *.dll meta.json
+
+      - name: Update manifest.json
+        run: |
+          CHECKSUM=$(md5sum oidc-rbac.zip | cut -d' ' -f1)
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          VERSION="${{ steps.version.outputs.version }}"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/oidc-rbac.zip"
+
+          cat > manifest.json <<EOF
+          [
+            {
+              "guid": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
+              "name": "OIDC RBAC",
+              "description": "Advanced OIDC authentication with role-based library access control",
+              "overview": "OpenID Connect SSO with role-to-library mapping, multi-provider support, and admin UI.",
+              "owner": "Ezeqielle",
+              "category": "Authentication",
+              "versions": [
+                {
+                  "version": "${VERSION}.0",
+                  "changelog": "Release ${GITHUB_REF_NAME}",
+                  "targetAbi": "10.11.0.0",
+                  "sourceUrl": "${DOWNLOAD_URL}",
+                  "checksum": "${CHECKSUM}",
+                  "timestamp": "${TIMESTAMP}"
+                }
+              ]
+            }
+          ]
+          EOF
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: oidc-rbac.zip
+          generate_release_notes: true
+
+      - name: Commit updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          cp manifest.json .
+          git add manifest.json
+          git commit -m "Update manifest.json for ${GITHUB_REF_NAME}" || echo "No changes"
+          git push origin main
