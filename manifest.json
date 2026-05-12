@@ -8,12 +8,12 @@
     "category": "Authentication",
     "versions": [
       {
-        "version": "1.0.0.0",
-        "changelog": "Release v1.0.0",
+        "version": "1.0.0.1.0",
+        "changelog": "Release v1.0.0.1",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/Ezeqielle/jellyfin-plugin-oidc/releases/download/v1.0.0/oidc-rbac.zip",
-        "checksum": "76aa05546eda50c0256694ff32e69290",
-        "timestamp": "2026-05-12T15:37:03Z"
+        "sourceUrl": "https://github.com/Ezeqielle/jellyfin-plugin-oidc/releases/download/v1.0.0.1/oidc-rbac.zip",
+        "checksum": "46ee960836d6c3d2cd120acb23f92d2b",
+        "timestamp": "2026-05-12T15:38:56Z"
       }
     ]
   }
