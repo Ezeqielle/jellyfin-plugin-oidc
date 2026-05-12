@@ -1,6 +1,7 @@
 using System;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
@@ -40,7 +41,7 @@ public class UserSyncService
             user.AuthenticationProviderId = typeof(Auth.OidcAuthProvider).FullName!;
 
             var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            await _userManager.ChangePassword(user, randomPassword).ConfigureAwait(false);
+            await _userManager.ChangePassword(user.Id, randomPassword).ConfigureAwait(false);
 
             _logger.LogInformation("Created new OIDC user: {Username}", username);
         }

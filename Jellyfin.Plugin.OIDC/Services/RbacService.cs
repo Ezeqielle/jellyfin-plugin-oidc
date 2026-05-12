@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.OIDC.Configuration;
 using MediaBrowser.Controller.Library;
@@ -88,7 +89,7 @@ public class RbacService
 
         if (merged.MaxParentalRating.HasValue)
         {
-            user.MaxParentalAgeRating = merged.MaxParentalRating;
+            user.MaxParentalRatingScore = merged.MaxParentalRating;
         }
 
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);

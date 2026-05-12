@@ -76,7 +76,7 @@ public class OidcController : ControllerBase
 
         var stateKey = _stateManager.StoreState(state);
 
-        var authorizeUrl = new RequestUrl(disco.AuthorizeEndpoint);
+        var authorizeUrl = new RequestUrl(disco.AuthorizeEndpoint!);
         var url = authorizeUrl.CreateAuthorizeUrl(
             clientId: provider.ClientId,
             responseType: OidcConstants.ResponseTypes.Code,
