@@ -9,11 +9,11 @@
     "versions": [
       {
         "version": "1.0.0.0",
-        "changelog": "Initial release: OIDC auth with PKCE, role-based library access, multi-provider, admin UI",
+        "changelog": "Release v1.0.0",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/Ezeqielle/jellyfin-plugin-oidc/releases/download/v1.0.0/oidc-rbac.zip",
-        "checksum": "fbc8fea175b43505d7108c692cdc084d",
-        "timestamp": "2026-05-12T13:49:10Z"
+        "checksum": "c9a0761afc4c8e432ccb2f9f61510656",
+        "timestamp": "2026-05-12T14:56:48Z"
       }
     ]
   }
