@@ -8,6 +8,14 @@
     "category": "Authentication",
     "versions": [
       {
+        "version": "1.0.2.0",
+        "changelog": "Fix OidcAuthProvider not registered with Jellyfin DI; fix new user creation crashing on ChangePassword; fix MaxParentalRating defaulting to 0; fix credential storage missing ServerId",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "",
+        "checksum": "",
+        "timestamp": "2026-05-28T00:00:00Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "Release v1.0.1",
         "targetAbi": "10.11.0.0",
