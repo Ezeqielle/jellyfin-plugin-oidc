@@ -7,6 +7,13 @@
   "category": "Authentication",
   "versions": [
     {
+      "version": "1.0.3.0",
+      "changelog": "Fix redirect_uri host detection behind reverse proxies (use Jellyfin's published URL); add optional per-provider ServerBaseUrl override",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-06-02T00:00:00Z"
+    },
+    {
       "version": "1.0.2.0",
       "changelog": "Update Jellyfin.Controller/Model to 10.11.10; fix ChangePassword call to use user ID",
       "targetAbi": "10.11.0.0",

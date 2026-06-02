@@ -43,6 +43,8 @@ public class OidcProviderConfig
     public string ButtonIcon { get; set; } = string.Empty;
 
     public string AdditionalParameters { get; set; } = string.Empty;
+
+    public string ServerBaseUrl { get; set; } = string.Empty;
 }
 
 public class RoleMapping
