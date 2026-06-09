@@ -151,9 +151,7 @@ public class RbacService
             EnableCollectionManagement = mappings.Any(m => m.EnableCollectionManagement),
             EnableSubtitleManagement = mappings.Any(m => m.EnableSubtitleManagement),
             MaxParentalRating = mappings
-                .Where(m => m.MaxParentalRating.HasValue)
-                .Select(m => m.MaxParentalRating!.Value)
-                .DefaultIfEmpty()
+                .Select(m => m.MaxParentalRating)
                 .Max(),
             LibraryIds = mappings
                 .SelectMany(m => m.LibraryIds)
