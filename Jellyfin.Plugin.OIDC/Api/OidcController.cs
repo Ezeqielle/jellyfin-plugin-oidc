@@ -175,12 +175,18 @@ public class OidcController : ControllerBase
 
         var displayName = ClaimParser.ExtractClaim(idToken, provider.DisplayNameClaim);
 
-        // Extract roles from both ID token and access token
+        // Extract roles from both the ID token and the access token, then union them.
+        // Providers differ in which token carries which claims (e.g. an admin group may
+        // land only in the access token), so relying on one token can silently drop roles.
         var roles = ClaimParser.ExtractRoles(idToken, provider.RoleClaim);
-        if (roles.Length == 0 && handler.CanReadToken(tokenResponse.AccessToken))
+        if (handler.CanReadToken(tokenResponse.AccessToken))
         {
             var accessToken = handler.ReadJwtToken(tokenResponse.AccessToken);
-            roles = ClaimParser.ExtractRoles(accessToken, provider.RoleClaim);
+            var accessRoles = ClaimParser.ExtractRoles(accessToken, provider.RoleClaim);
+            roles = roles
+                .Concat(accessRoles)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         _logger.LogInformation("OIDC auth successful: user={Username}, roles=[{Roles}], provider={Provider}",

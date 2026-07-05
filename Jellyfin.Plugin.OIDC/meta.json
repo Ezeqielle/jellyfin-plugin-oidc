@@ -7,6 +7,13 @@
   "category": "Authentication",
   "versions": [
     {
+      "version": "1.0.5.0",
+      "changelog": "Fix admin role not being applied when role claims are split across the ID and access tokens (union roles from both); force EnableAllFolders for administrators; add RBAC diagnostic logging",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-07-05T00:00:00Z"
+    },
+    {
       "version": "1.0.3.0",
       "changelog": "Fix redirect_uri host detection behind reverse proxies (use Jellyfin's published URL); add optional per-provider ServerBaseUrl override",
       "targetAbi": "10.11.0.0",

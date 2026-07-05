@@ -65,6 +65,13 @@ public class RbacService
 
         var merged = MergeMappings(matchedMappings);
 
+        _logger.LogInformation(
+            "RBAC matched for user {Username}: roles=[{Roles}], matched mappings=[{Matched}], resolved admin={IsAdmin}",
+            user.Username,
+            string.Join(", ", userRoles),
+            string.Join(", ", matchedMappings.Select(m => m.RoleName)),
+            merged.IsAdmin);
+
         user.SetPermission(PermissionKind.IsAdministrator, merged.IsAdmin);
         user.SetPermission(PermissionKind.EnableMediaPlayback, merged.EnableMediaPlayback);
         user.SetPermission(PermissionKind.EnableRemoteAccess, merged.EnableRemoteAccess);
@@ -76,7 +83,9 @@ public class RbacService
         user.SetPermission(PermissionKind.EnableCollectionManagement, merged.EnableCollectionManagement);
         user.SetPermission(PermissionKind.EnableSubtitleManagement, merged.EnableSubtitleManagement);
 
-        if (merged.EnableAllLibraries)
+        // Administrators can access every library regardless of folder settings.
+        // Force EnableAllFolders on for admins so the policy state stays consistent.
+        if (merged.EnableAllLibraries || merged.IsAdmin)
         {
             user.SetPermission(PermissionKind.EnableAllFolders, true);
         }
