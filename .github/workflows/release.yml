@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history + tag objects so the annotated tag message is readable below.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -23,6 +26,29 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Extract changelog from tag
+        id: changelog
+        run: |
+          # Use the annotated tag message as the catalog changelog:
+          # subject line, plus body if the tag has one.
+          SUBJECT=$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")
+          BODY=$(git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME")
+
+          if [ -z "$SUBJECT" ]; then
+            # Lightweight tag (no annotation) — fall back to a generic message.
+            CHANGELOG="Release $GITHUB_REF_NAME"
+          elif [ -n "$BODY" ]; then
+            CHANGELOG="$SUBJECT"$'\n\n'"$BODY"
+          else
+            CHANGELOG="$SUBJECT"
+          fi
+
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            printf '%s\n' "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: dotnet publish Jellyfin.Plugin.OIDC/Jellyfin.Plugin.OIDC.csproj -c Release -o dist
 
@@ -30,34 +56,42 @@ jobs:
         run: cd dist && zip ../oidc-rbac.zip *.dll meta.json
 
       - name: Update manifest.json
+        env:
+          # Passed as env (not inline `${{ }}`) so multi-line / special characters
+          # in the changelog can't break the shell command.
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
           CHECKSUM=$(md5sum oidc-rbac.zip | cut -d' ' -f1)
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          VERSION="${{ steps.version.outputs.version }}"
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/oidc-rbac.zip"
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${REF_NAME}/oidc-rbac.zip"
 
-          cat > manifest.json <<EOF
-          [
-            {
-              "guid": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
-              "name": "OIDC RBAC",
-              "description": "Advanced OIDC authentication with role-based library access control",
-              "overview": "OpenID Connect SSO with role-to-library mapping, multi-provider support, and admin UI.",
-              "owner": "Ezeqielle",
-              "category": "Authentication",
-              "versions": [
-                {
-                  "version": "${VERSION}.0",
-                  "changelog": "Release ${GITHUB_REF_NAME}",
-                  "targetAbi": "10.11.0.0",
-                  "sourceUrl": "${DOWNLOAD_URL}",
-                  "checksum": "${CHECKSUM}",
-                  "timestamp": "${TIMESTAMP}"
-                }
-              ]
-            }
-          ]
-          EOF
+          # Build with jq so the changelog is JSON-escaped safely.
+          jq -n \
+            --arg version "${VERSION}.0" \
+            --arg changelog "$CHANGELOG" \
+            --arg targetAbi "10.11.0.0" \
+            --arg sourceUrl "$DOWNLOAD_URL" \
+            --arg checksum "$CHECKSUM" \
+            --arg timestamp "$TIMESTAMP" \
+            '[{
+              guid: "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
+              name: "OIDC RBAC",
+              description: "Advanced OIDC authentication with role-based library access control",
+              overview: "OpenID Connect SSO with role-to-library mapping, multi-provider support, and admin UI.",
+              owner: "Ezeqielle",
+              category: "Authentication",
+              versions: [{
+                version: $version,
+                changelog: $changelog,
+                targetAbi: $targetAbi,
+                sourceUrl: $sourceUrl,
+                checksum: $checksum,
+                timestamp: $timestamp
+              }]
+            }]' > manifest.json
 
       - name: Create release
         uses: softprops/action-gh-release@v3
