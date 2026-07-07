@@ -61,9 +61,26 @@ Go to **Admin Dashboard > Plugins > OIDC RBAC > Providers tab**
 | Scopes             | `openid profile email`                                     |
 | Role Claim Path    | `groups`                                                   |
 | Username Claim     | `preferred_username`                                       |
+| Picture Claim      | `picture`                                                  |
+| Sync profile image | *(checkbox, on by default)*                                |
 | Server Base URL    | *(optional, e.g. `https://jellyfin.example.com`)*          |
 
 > **Server Base URL** is only needed if Jellyfin can't resolve its public URL on its own (e.g. behind a reverse proxy whose `X-Forwarded-*` headers aren't trusted). See [Reverse proxy / redirect_uri](#reverse-proxy--redirect_uri).
+
+### Profile image sync
+
+When **Sync profile image** is enabled, on every login the plugin reads the **Picture Claim**
+(default `picture`, the standard OIDC avatar claim) and sets it as the user's Jellyfin avatar,
+overwriting any existing one. It looks in the ID token, then the access token, then the
+provider's **userinfo** endpoint. Failures never block login. Leave the claim blank or uncheck
+the box to disable it for a provider.
+
+> The provider must actually emit the claim. Many IdPs do not include `picture` by default:
+> - **Authentik** — its default `profile` scope omits `picture`. Add a Scope Mapping (scope
+>   name `profile`) with expression `return {"picture": request.user.avatar}`.
+> - **Keycloak** — add a "User Attribute"/hardcoded mapper that puts a `picture` claim in the
+>   ID token or userinfo.
+> - **Google** — includes `picture` in the ID token by default.
 
 ### 2. Create Role Mappings
 

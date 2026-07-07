@@ -189,6 +189,48 @@ public class OidcController : ControllerBase
                 .ToArray();
         }
 
+        // Optionally extract the profile-image URL (standard OIDC "picture" claim). Like roles,
+        // check the ID token first and fall back to the access token, since providers differ
+        // in which token carries the claim.
+        string? pictureUrl = null;
+        if (provider.SyncProfileImage && !string.IsNullOrWhiteSpace(provider.PictureClaim))
+        {
+            pictureUrl = ClaimParser.ExtractClaim(idToken, provider.PictureClaim);
+            if (string.IsNullOrEmpty(pictureUrl) && handler.CanReadToken(tokenResponse.AccessToken))
+            {
+                pictureUrl = ClaimParser.ExtractClaim(
+                    handler.ReadJwtToken(tokenResponse.AccessToken), provider.PictureClaim);
+            }
+
+            // Many providers (e.g. Authentik) expose the picture only via the userinfo
+            // endpoint, not in the tokens. Fall back to userinfo when it's in neither token.
+            if (string.IsNullOrEmpty(pictureUrl)
+                && !string.IsNullOrEmpty(disco.UserInfoEndpoint)
+                && !string.IsNullOrEmpty(tokenResponse.AccessToken))
+            {
+                var userInfo = await httpClient.GetUserInfoAsync(new UserInfoRequest
+                {
+                    Address = disco.UserInfoEndpoint,
+                    Token = tokenResponse.AccessToken
+                }).ConfigureAwait(false);
+
+                if (userInfo.IsError)
+                {
+                    _logger.LogWarning("OIDC userinfo request failed: {Error}", userInfo.Error);
+                }
+                else
+                {
+                    pictureUrl = userInfo.Claims
+                        .FirstOrDefault(c => c.Type == provider.PictureClaim)?.Value;
+                }
+            }
+
+            _logger.LogInformation(
+                "OIDC picture claim '{Claim}' for user {User}: {Result}",
+                provider.PictureClaim, username,
+                string.IsNullOrEmpty(pictureUrl) ? "not found in token or userinfo" : pictureUrl);
+        }
+
         _logger.LogInformation("OIDC auth successful: user={Username}, roles=[{Roles}], provider={Provider}",
             username, string.Join(", ", roles), providerId);
 
@@ -197,6 +239,7 @@ public class OidcController : ControllerBase
             ProviderId = providerId,
             Username = username,
             DisplayName = displayName,
+            PictureUrl = string.IsNullOrEmpty(pictureUrl) ? null : pictureUrl,
             Roles = roles
         });
 
@@ -224,7 +267,8 @@ public class OidcController : ControllerBase
             var userId = await _userSyncService.SyncUserAsync(
                 session.Username,
                 session.DisplayName,
-                session.Roles).ConfigureAwait(false);
+                session.Roles,
+                session.PictureUrl).ConfigureAwait(false);
 
             var authRequest = new AuthenticationRequest
             {
