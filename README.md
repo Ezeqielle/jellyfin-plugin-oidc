@@ -76,8 +76,8 @@ provider's **userinfo** endpoint. Failures never block login. Leave the claim bl
 the box to disable it for a provider.
 
 > The provider must actually emit the claim. Many IdPs do not include `picture` by default:
-> - **Authentik** — its default `profile` scope omits `picture`. Add a Scope Mapping (scope
->   name `profile`) with expression `return {"picture": request.user.avatar}`.
+> - **Authentik** — its default `profile` scope omits `picture`. Add a Scope Mapping and attach
+>   it to the provider — see [Authentik: Profile Picture / Avatar](examples/authentik/SETUP.md#25-optional-profile-picture--avatar).
 > - **Keycloak** — add a "User Attribute"/hardcoded mapper that puts a `picture` claim in the
 >   ID token or userinfo.
 > - **Google** — includes `picture` in the ID token by default.
