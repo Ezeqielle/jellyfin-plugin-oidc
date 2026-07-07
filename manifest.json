@@ -8,12 +8,12 @@
     "category": "Authentication",
     "versions": [
       {
-        "version": "1.0.5.0",
-        "changelog": "Release v1.0.5",
+        "version": "1.0.6.0",
+        "changelog": "Fix new-user login 500 and persist role mappings\n\nRe-fetch a fresh user copy and retry on optimistic-concurrency conflict so\nnew-user provisioning no longer fails with DbUpdateConcurrencyException.\n\nPersist role mappings (admin flag, permissions, per-role library access) via\nIUserManager.UpdatePolicyAsync instead of UpdateUserAsync, which only saved\nthe root User row and silently dropped child Permission/Preference changes —\nleaving users with access to all libraries.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/Ezeqielle/jellyfin-plugin-oidc/releases/download/v1.0.5/oidc-rbac.zip",
-        "checksum": "7dd2e6aef353f24872ab6b7c947489b1",
-        "timestamp": "2026-07-05T14:27:32Z"
+        "sourceUrl": "https://github.com/Ezeqielle/jellyfin-plugin-oidc/releases/download/v1.0.6/oidc-rbac.zip",
+        "checksum": "16d1f658d43fcf9935f716f74159ad03",
+        "timestamp": "2026-07-07T23:23:48Z"
       }
     ]
   }
