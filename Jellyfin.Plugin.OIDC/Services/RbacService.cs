@@ -6,6 +6,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.OIDC.Configuration;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Users;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.OIDC.Services;
@@ -41,6 +42,15 @@ public class RbacService
             return;
         }
 
+        // Read the user's current policy and mutate only the fields we manage. Persistence MUST
+        // go through UpdatePolicyAsync: IUserManager.UpdateUserAsync only writes the root User row
+        // and silently drops Permission/Preference changes (admin flag, enabled folders, ...),
+        // which would leave users on Jellyfin's permissive default (access to all libraries).
+        var policy = _userManager.GetUserDto(user).Policy;
+
+        // OIDC-authenticated users are always enabled on login.
+        policy.IsDisabled = false;
+
         var matchedMappings = config.RoleMappings
             .Where(m => userRoles.Contains(m.RoleName, StringComparer.OrdinalIgnoreCase))
             .OrderByDescending(m => m.Priority)
@@ -58,8 +68,9 @@ public class RbacService
 
         if (matchedMappings.Count == 0)
         {
-            _logger.LogInformation("No role mappings matched for user {Username} with roles [{Roles}]",
+            _logger.LogInformation("No role mappings matched for user {Username} with roles [{Roles}]; leaving permissions unchanged",
                 user.Username, string.Join(", ", userRoles));
+            await _userManager.UpdatePolicyAsync(userId, policy).ConfigureAwait(false);
             return;
         }
 
@@ -72,42 +83,46 @@ public class RbacService
             string.Join(", ", matchedMappings.Select(m => m.RoleName)),
             merged.IsAdmin);
 
-        user.SetPermission(PermissionKind.IsAdministrator, merged.IsAdmin);
-        user.SetPermission(PermissionKind.EnableMediaPlayback, merged.EnableMediaPlayback);
-        user.SetPermission(PermissionKind.EnableRemoteAccess, merged.EnableRemoteAccess);
-        user.SetPermission(PermissionKind.EnableAudioPlaybackTranscoding, merged.EnableTranscoding);
-        user.SetPermission(PermissionKind.EnableVideoPlaybackTranscoding, merged.EnableTranscoding);
-        user.SetPermission(PermissionKind.EnableLiveTvAccess, merged.EnableLiveTv);
-        user.SetPermission(PermissionKind.EnableLiveTvManagement, merged.EnableLiveTvManagement);
-        user.SetPermission(PermissionKind.EnableContentDeletion, merged.EnableContentDeletion);
-        user.SetPermission(PermissionKind.EnableCollectionManagement, merged.EnableCollectionManagement);
-        user.SetPermission(PermissionKind.EnableSubtitleManagement, merged.EnableSubtitleManagement);
+        policy.IsAdministrator = merged.IsAdmin;
+        policy.EnableMediaPlayback = merged.EnableMediaPlayback;
+        policy.EnableRemoteAccess = merged.EnableRemoteAccess;
+        policy.EnableAudioPlaybackTranscoding = merged.EnableTranscoding;
+        policy.EnableVideoPlaybackTranscoding = merged.EnableTranscoding;
+        policy.EnableLiveTvAccess = merged.EnableLiveTv;
+        policy.EnableLiveTvManagement = merged.EnableLiveTvManagement;
+        policy.EnableContentDeletion = merged.EnableContentDeletion;
+        policy.EnableCollectionManagement = merged.EnableCollectionManagement;
+        policy.EnableSubtitleManagement = merged.EnableSubtitleManagement;
 
         // Administrators can access every library regardless of folder settings.
         // Force EnableAllFolders on for admins so the policy state stays consistent.
         if (merged.EnableAllLibraries || merged.IsAdmin)
         {
-            user.SetPermission(PermissionKind.EnableAllFolders, true);
+            policy.EnableAllFolders = true;
+            policy.EnabledFolders = Array.Empty<Guid>();
         }
         else
         {
-            user.SetPermission(PermissionKind.EnableAllFolders, false);
-            var resolvedIds = ResolveLibraryIds(merged.LibraryIds, merged.LibraryNames);
-            user.SetPreference(PreferenceKind.EnabledFolders, resolvedIds.ToArray());
+            policy.EnableAllFolders = false;
+            policy.EnabledFolders = ResolveLibraryIds(merged.LibraryIds, merged.LibraryNames)
+                .Select(id => Guid.TryParse(id, out var g) ? (Guid?)g : null)
+                .Where(g => g.HasValue)
+                .Select(g => g!.Value)
+                .ToArray();
         }
 
         if (merged.MaxParentalRating.HasValue)
         {
-            user.MaxParentalRatingScore = merged.MaxParentalRating;
+            policy.MaxParentalRating = merged.MaxParentalRating;
         }
 
-        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        await _userManager.UpdatePolicyAsync(userId, policy).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Applied RBAC for user {Username}: admin={IsAdmin}, libraries={LibraryCount}, roles matched=[{Roles}]",
             user.Username,
             merged.IsAdmin,
-            merged.EnableAllLibraries ? "ALL" : merged.LibraryIds.Count.ToString(),
+            merged.EnableAllLibraries || merged.IsAdmin ? "ALL" : policy.EnabledFolders.Length.ToString(),
             string.Join(", ", matchedMappings.Select(m => m.RoleName)));
     }
 
