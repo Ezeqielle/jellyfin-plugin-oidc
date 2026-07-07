@@ -118,6 +118,38 @@ Update the plugin config:
 - Scopes: `openid profile email jellyfin-roles`
 - Role Claim Path: `roles`
 
+### 2.5 (Optional) Profile Picture / Avatar
+
+The plugin can set each user's Jellyfin avatar from the OIDC `picture` claim on every login
+(see [Profile image sync](../../README.md#profile-image-sync)). **Authentik does not emit
+`picture` by default** — its built-in `profile` scope has no avatar claim — so you must add one.
+
+1. Go to **Customization > Property Mappings > Create > Scope Mapping**
+   - Name: `OIDC profile picture`
+   - Scope name: `profile`  *(reuse the scope the plugin already requests)*
+   - Expression:
+     ```python
+     return {"picture": request.user.avatar}
+     ```
+2. **Attach the mapping to the provider** — creating it is not enough. Go to
+   **Applications > Providers > _your Jellyfin provider_ > Edit > Advanced protocol settings**
+   and add `OIDC profile picture` to **Selected Scopes** (keep `openid`, `email`, and the
+   default `profile` selected as well). Save.
+3. Make sure Authentik actually produces an avatar URL. Under
+   **Admin > System > Settings > Avatars**, a value like `gravatar,initials` always yields a
+   URL; if it is set to an attribute that's empty for the user, `request.user.avatar` comes
+   back blank and nothing is synced.
+
+In the plugin's provider config, leave **Picture Claim** as `picture` and keep **Sync profile
+image** checked (both are the defaults). No extra scope is needed because the mapping reuses
+`profile`.
+
+Verify from the Jellyfin server logs on the next login:
+```
+OIDC picture claim 'picture' for user "<name>": https://www.gravatar.com/avatar/...
+ProfileImageService: Applied OIDC profile image for user "<name>"
+```
+
 ---
 
 ## 3. Configure the Jellyfin Plugin

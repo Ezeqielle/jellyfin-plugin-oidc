@@ -11,19 +11,22 @@ public class UserSyncService
 {
     private readonly IUserManager _userManager;
     private readonly RbacService _rbacService;
+    private readonly ProfileImageService _profileImageService;
     private readonly ILogger<UserSyncService> _logger;
 
     public UserSyncService(
         IUserManager userManager,
         RbacService rbacService,
+        ProfileImageService profileImageService,
         ILogger<UserSyncService> logger)
     {
         _userManager = userManager;
         _rbacService = rbacService;
+        _profileImageService = profileImageService;
         _logger = logger;
     }
 
-    public async Task<Guid> SyncUserAsync(string username, string? displayName, string[] roles)
+    public async Task<Guid> SyncUserAsync(string username, string? displayName, string[] roles, string? pictureUrl)
     {
         var user = _userManager.GetUserByName(username);
         var isNewUser = user == null;
@@ -50,10 +53,10 @@ public class UserSyncService
         if (isNewUser)
         {
             // AuthenticationProviderId is a scalar on the User row, so UpdateUserAsync persists
-            // it correctly (child permissions do NOT persist that way — RBAC handles those via
-            // UpdatePolicyAsync). Jellyfin's UserManager uses a fresh DbContext per call with an
-            // optimistic-concurrency token, and CreateUserAsync + ChangePassword advance the row
-            // version, leaving the instance we hold stale — so re-fetch a fresh copy and retry.
+            // it correctly (child permissions do not persist that way — RBAC handles those via
+            // UpdatePolicyAsync below). Jellyfin's UserManager uses a fresh DbContext per call
+            // with an optimistic-concurrency token, and CreateUserAsync + ChangePassword advance
+            // the row version, leaving the instance we hold stale — so re-fetch and retry.
             await UpdateUserResilientAsync(
                 userId,
                 u => u.AuthenticationProviderId = typeof(Auth.OidcAuthProvider).FullName!)
@@ -63,6 +66,7 @@ public class UserSyncService
         // RBAC applies permissions/library access and re-enables the account, persisting via
         // UpdatePolicyAsync (the only path that saves Permission/Preference changes).
         await _rbacService.ApplyRoleMappingsAsync(userId, roles).ConfigureAwait(false);
+        await _profileImageService.ApplyProfileImageAsync(userId, pictureUrl).ConfigureAwait(false);
 
         return userId;
     }
