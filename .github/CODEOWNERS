@@ -1,0 +1,4 @@
+# Require @Ezeqielle's review/approval on all changes.
+# Combined with branch protection on `main` (require code owner review),
+# this ensures no pull request can be merged without the repo owner's approval.
+* @Ezeqielle
