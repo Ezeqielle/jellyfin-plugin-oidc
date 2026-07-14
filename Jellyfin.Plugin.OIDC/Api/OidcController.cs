@@ -413,7 +413,7 @@ public class OidcController : ControllerBase
                 p.DisplayName,
                 p.ButtonColor,
                 p.ButtonIcon,
-                StartUrl = $"{Request.Scheme}://{Request.Host}/sso/OIDC/Start/{p.ProviderId}"
+                StartUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/sso/OIDC/Start/{p.ProviderId}"
             });
 
         return Ok(providers);
@@ -487,10 +487,14 @@ public class OidcController : ControllerBase
             const token = '{{sessionToken}}';
             const providerId = '{{providerId}}';
 
+            // Jellyfin may run under a base path (Networking > Base URL). Derive it from the URL
+            // this callback was served at, so every link below keeps the prefix. Empty when unset.
+            const basePath = window.location.pathname.replace(/\/sso\/OIDC\/Callback\/[^/]+\/?$/i, '');
+
             const deviceId = localStorage.getItem('_deviceId2') || crypto.randomUUID();
             localStorage.setItem('_deviceId2', deviceId);
 
-            fetch('/sso/OIDC/Auth/' + providerId, {
+            fetch(basePath + '/sso/OIDC/Auth/' + providerId, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -508,7 +512,7 @@ public class OidcController : ControllerBase
             .then(function(auth) {
                 var credentials = {
                     Servers: [{
-                        ManualAddress: window.location.origin,
+                        ManualAddress: window.location.origin + basePath,
                         AccessToken: auth.AccessToken,
                         UserId: auth.User.Id,
                         IsLocalUser: true
@@ -524,7 +528,7 @@ public class OidcController : ControllerBase
                 localStorage.setItem('_jellyfin_user_' + auth.ServerId, JSON.stringify(user));
 
                 document.getElementById('status').textContent = 'Success! Redirecting...';
-                window.location.href = '/';
+                window.location.href = basePath + '/';
             })
             .catch(function(err) {
                 document.getElementById('status').textContent = 'Error: ' + err.message;
@@ -576,6 +580,8 @@ public class OidcController : ControllerBase
         (function() {
             const token = '{{sessionToken}}';
             const providerId = '{{providerId}}';
+            // Preserve Jellyfin's base path (Networking > Base URL); empty when unset.
+            const basePath = window.location.pathname.replace(/\/sso\/OIDC\/Callback\/[^/]+\/?$/i, '');
             const codeInput = document.getElementById('code');
             const button = document.getElementById('submit');
             const msg = document.getElementById('msg');
@@ -589,7 +595,7 @@ public class OidcController : ControllerBase
                 msg.className = '';
                 msg.textContent = 'Authorizing...';
 
-                fetch('/sso/OIDC/QuickConnect/Authorize/' + encodeURIComponent(providerId), {
+                fetch(basePath + '/sso/OIDC/QuickConnect/Authorize/' + encodeURIComponent(providerId), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ Token: token, Code: code })
