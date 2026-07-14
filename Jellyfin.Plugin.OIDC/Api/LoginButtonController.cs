@@ -41,6 +41,13 @@ public class LoginButtonController : ControllerBase
             sb.AppendLine($"    btn_{p.ProviderId}.textContent = 'Sign in with {escapedName}';");
             sb.AppendLine($"    btn_{p.ProviderId}.style.cssText = 'display:block;margin:0.5em auto;padding:0.7em 1.5em;background:{escapedColor};color:#fff;text-decoration:none;border-radius:4px;font-size:1em;max-width:300px;';");
             sb.AppendLine($"    container.appendChild(btn_{p.ProviderId});");
+
+            // Quick Connect link: for signing in a native/mobile app that can't show these buttons.
+            sb.AppendLine($"    var qc_{p.ProviderId} = document.createElement('a');");
+            sb.AppendLine($"    qc_{p.ProviderId}.href = '/sso/OIDC/QuickConnect/{p.ProviderId}';");
+            sb.AppendLine($"    qc_{p.ProviderId}.textContent = 'Sign in a device with {escapedName} (Quick Connect)';");
+            sb.AppendLine($"    qc_{p.ProviderId}.style.cssText = 'display:block;margin:0.2em auto 0.8em;color:#888;text-decoration:none;font-size:0.8em;max-width:300px;';");
+            sb.AppendLine($"    container.appendChild(qc_{p.ProviderId});");
         }
 
         sb.AppendLine("    var sep = document.createElement('div');");
