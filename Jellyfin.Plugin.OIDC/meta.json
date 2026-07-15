@@ -7,6 +7,13 @@
   "category": "Authentication",
   "versions": [
     {
+      "version": "1.0.8.0",
+      "changelog": "Add native/mobile app SSO via Jellyfin Quick Connect: authenticate in a browser, then enter the code shown by your Android/iOS/TV app (the web login button only works in the browser client). Fix SSO links not honoring a Jellyfin base URL (Networking > Base URL) — the callback previously redirected to /sso/OIDC/Auth without the prefix and 404'd on prefixed deployments",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-07-15T00:00:00Z"
+    },
+    {
       "version": "1.0.7.0",
       "changelog": "Add optional profile-image sync: set a user's Jellyfin avatar from the OIDC picture claim on each login (per-provider Picture Claim field + Sync profile image toggle). Reads the ID token, access token, then the userinfo endpoint; failures never block login",
       "targetAbi": "10.11.0.0",
