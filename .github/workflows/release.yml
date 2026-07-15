@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -99,14 +100,27 @@ jobs:
           files: oidc-rbac.zip
           generate_release_notes: true
 
-      - name: Commit updated manifest
+      # Branch protection on main blocks the bot from pushing directly, so open a PR
+      # with the regenerated manifest. Merge it to publish the release to the catalog.
+      - name: Open manifest update PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          BRANCH="chore/manifest-${GITHUB_REF_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           cp manifest.json /tmp/manifest.json
           git fetch origin main
-          git checkout main
+          git checkout -B "$BRANCH" origin/main
           cp /tmp/manifest.json manifest.json
           git add manifest.json
-          git commit -m "Update manifest.json for ${GITHUB_REF_NAME}" || echo "No changes"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "manifest.json already up to date; nothing to do"
+            exit 0
+          fi
+          git commit -m "Update manifest.json for ${GITHUB_REF_NAME}"
+          git push -f origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Update manifest.json for ${GITHUB_REF_NAME}" \
+            --body "Automated manifest bump for the ${GITHUB_REF_NAME} release. Merge to publish it to the plugin catalog." \
+            || echo "PR already exists for $BRANCH; branch updated in place"
