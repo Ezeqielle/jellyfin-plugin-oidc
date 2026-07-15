@@ -25,6 +25,10 @@ public class LoginButtonController : ControllerBase
 
         var sb = new StringBuilder();
         sb.AppendLine("(function() {");
+        // Jellyfin may run under a base path (Networking > Base URL). The web client is served
+        // under '<basePath>/web/', so derive the prefix from the login page URL. Empty when unset.
+        sb.AppendLine("  var _p = window.location.pathname.split('/web/');");
+        sb.AppendLine("  var basePath = _p.length > 1 ? _p[0] : '';");
         sb.AppendLine("  function addButtons() {");
         sb.AppendLine("    var form = document.querySelector('.manualLoginForm, #loginPage form, [data-role=\"page\"] form');");
         sb.AppendLine("    if (!form || document.getElementById('oidc-sso-buttons')) return;");
@@ -37,14 +41,14 @@ public class LoginButtonController : ControllerBase
             var escapedName = p.DisplayName.Replace("'", "\\'");
             var escapedColor = p.ButtonColor.Replace("'", "\\'");
             sb.AppendLine($"    var btn_{p.ProviderId} = document.createElement('a');");
-            sb.AppendLine($"    btn_{p.ProviderId}.href = '/sso/OIDC/Start/{p.ProviderId}';");
+            sb.AppendLine($"    btn_{p.ProviderId}.href = basePath + '/sso/OIDC/Start/{p.ProviderId}';");
             sb.AppendLine($"    btn_{p.ProviderId}.textContent = 'Sign in with {escapedName}';");
             sb.AppendLine($"    btn_{p.ProviderId}.style.cssText = 'display:block;margin:0.5em auto;padding:0.7em 1.5em;background:{escapedColor};color:#fff;text-decoration:none;border-radius:4px;font-size:1em;max-width:300px;';");
             sb.AppendLine($"    container.appendChild(btn_{p.ProviderId});");
 
             // Quick Connect link: for signing in a native/mobile app that can't show these buttons.
             sb.AppendLine($"    var qc_{p.ProviderId} = document.createElement('a');");
-            sb.AppendLine($"    qc_{p.ProviderId}.href = '/sso/OIDC/QuickConnect/{p.ProviderId}';");
+            sb.AppendLine($"    qc_{p.ProviderId}.href = basePath + '/sso/OIDC/QuickConnect/{p.ProviderId}';");
             sb.AppendLine($"    qc_{p.ProviderId}.textContent = 'Sign in a device with {escapedName} (Quick Connect)';");
             sb.AppendLine($"    qc_{p.ProviderId}.style.cssText = 'display:block;margin:0.2em auto 0.8em;color:#888;text-decoration:none;font-size:0.8em;max-width:300px;';");
             sb.AppendLine($"    container.appendChild(qc_{p.ProviderId});");
@@ -67,7 +71,10 @@ public class LoginButtonController : ControllerBase
     [HttpGet("BrandingSnippet")]
     public ActionResult GetBrandingSnippet()
     {
-        var snippet = "<script src=\"/sso/OIDC/LoginButtons\"></script>";
+        // Include Jellyfin's base path (Networking > Base URL) so the script loads under a
+        // prefixed deployment. Empty PathBase (no base URL) yields the same root-relative src.
+        var basePath = Request.PathBase.HasValue ? Request.PathBase.Value : string.Empty;
+        var snippet = $"<script src=\"{basePath}/sso/OIDC/LoginButtons\"></script>";
         return Ok(new { Html = snippet, Instructions = "Add this to Jellyfin Dashboard > General > Custom CSS/HTML, or paste the <script> tag into the Login Disclaimer field under Branding." });
     }
 }

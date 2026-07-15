@@ -114,6 +114,10 @@ Go to **Admin Dashboard > General > Branding > Login disclaimer** and paste:
 </a>
 ```
 
+> The auto-injected buttons (`/sso/OIDC/LoginButtons`) and the SSO flow automatically honor a
+> Jellyfin **base URL** (Networking > Base URL). If you hand-write the `<a>` snippet above and run
+> Jellyfin under a base path, prefix the href yourself, e.g. `href="/base_url/sso/OIDC/Start/authentik"`.
+
 ## Migrating Existing Users
 
 Already have Jellyfin users you want to move to SSO without losing watch history? See [MIGRATION.md](MIGRATION.md) — username-match is automatic, but there are a few caveats around permissions overwrite and password fallback.
