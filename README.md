@@ -123,6 +123,9 @@ Go to **Admin Dashboard > General > Branding > Login disclaimer** and paste:
 ## Migrating Existing Users
 
 Already have Jellyfin users you want to move to SSO without losing watch history? See [MIGRATION.md](MIGRATION.md) — username-match is automatic, but there are a few caveats around permissions overwrite and password fallback.
+Also it is recommendable that you create a backup-admin user with password login, for two reasons:
+* If your provider is down, you can still log in
+* If you mess up the roles, your main administrator account will get downgraded to a normal user. If this happens, try this [fix](https://jellyfin.org/docs/general/administration/troubleshooting/#unlock-locked-user-account).
 
 ## How It Works
 
