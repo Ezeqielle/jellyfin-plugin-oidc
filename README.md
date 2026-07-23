@@ -215,11 +215,11 @@ If no role mappings match a user's IdP roles, the **Default Role** (configured i
 
 The **Role Claim Path** supports:
 
-| Path                   | Token Structure                                  | Provider     |
-|------------------------|--------------------------------------------------|--------------|
-| `groups`               | `{"groups": ["admin", "users"]}`                 | Authentik    |
-| `realm_access.roles`   | `{"realm_access": {"roles": ["admin"]}}`         | Keycloak     |
-| `roles`                | `{"roles": ["admin"]}`                           | Custom/Azure |
+| Path                   | Token Structure                                  | Provider           |
+|------------------------|--------------------------------------------------|--------------------|
+| `groups`               | `{"groups": ["admin", "users"]}`                 | Authentik/Pocket-Id|
+| `realm_access.roles`   | `{"realm_access": {"roles": ["admin"]}}`         | Keycloak           |
+| `roles`                | `{"roles": ["admin"]}`                           | Custom/Azure       |
 
 The plugin checks both the ID token and access token for role claims.
 
