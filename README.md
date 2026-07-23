@@ -56,10 +56,10 @@ Go to **Admin Dashboard > Plugins > OIDC RBAC > Providers tab**
 |--------------------|------------------------------------------------------------|
 | Provider ID        | `authentik`                                                |
 | Display Name       | `Authentik`                                                |
-| Authority URL      | `https://auth.example.com/application/o/jellyfin/`        |
+| Authority URL      | `https://auth.example.com/application/o/jellyfin/`         |
 | Client ID          | *(from your IdP)*                                          |
 | Client Secret      | *(from your IdP)*                                          |
-| Scopes             | `openid profile email`                                     |
+| Scopes             | `openid profile email groups`                              |
 | Role Claim Path    | `groups`                                                   |
 | Username Claim     | `preferred_username`                                       |
 | Picture Claim      | `picture`                                                  |
@@ -67,6 +67,8 @@ Go to **Admin Dashboard > Plugins > OIDC RBAC > Providers tab**
 | Server Base URL    | *(optional, e.g. `https://jellyfin.example.com`)*          |
 
 > **Server Base URL** is only needed if Jellyfin can't resolve its public URL on its own (e.g. behind a reverse proxy whose `X-Forwarded-*` headers aren't trusted). See [Reverse proxy / redirect_uri](#reverse-proxy--redirect_uri).
+
+You may also need to put the appropriate role path in the scope. See [Supported Claim Paths](#supported-claim-paths).
 
 ### Profile image sync
 
@@ -121,6 +123,9 @@ Go to **Admin Dashboard > General > Branding > Login disclaimer** and paste:
 ## Migrating Existing Users
 
 Already have Jellyfin users you want to move to SSO without losing watch history? See [MIGRATION.md](MIGRATION.md) — username-match is automatic, but there are a few caveats around permissions overwrite and password fallback.
+Also it is recommendable that you create a backup-admin user with password login, for two reasons:
+* If your provider is down, you can still log in
+* If you mess up the roles, your main administrator account will get downgraded to a normal user. If this happens, try this [fix](https://jellyfin.org/docs/general/administration/troubleshooting/#unlock-locked-user-account).
 
 ## How It Works
 
@@ -210,11 +215,11 @@ If no role mappings match a user's IdP roles, the **Default Role** (configured i
 
 The **Role Claim Path** supports:
 
-| Path                   | Token Structure                                  | Provider     |
-|------------------------|--------------------------------------------------|--------------|
-| `groups`               | `{"groups": ["admin", "users"]}`                 | Authentik    |
-| `realm_access.roles`   | `{"realm_access": {"roles": ["admin"]}}`         | Keycloak     |
-| `roles`                | `{"roles": ["admin"]}`                           | Custom/Azure |
+| Path                   | Token Structure                                  | Provider           |
+|------------------------|--------------------------------------------------|--------------------|
+| `groups`               | `{"groups": ["admin", "users"]}`                 | Authentik/Pocket-Id|
+| `realm_access.roles`   | `{"realm_access": {"roles": ["admin"]}}`         | Keycloak           |
+| `roles`                | `{"roles": ["admin"]}`                           | Custom/Azure       |
 
 The plugin checks both the ID token and access token for role claims.
 
