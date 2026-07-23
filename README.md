@@ -56,10 +56,10 @@ Go to **Admin Dashboard > Plugins > OIDC RBAC > Providers tab**
 |--------------------|------------------------------------------------------------|
 | Provider ID        | `authentik`                                                |
 | Display Name       | `Authentik`                                                |
-| Authority URL      | `https://auth.example.com/application/o/jellyfin/`        |
+| Authority URL      | `https://auth.example.com/application/o/jellyfin/`         |
 | Client ID          | *(from your IdP)*                                          |
 | Client Secret      | *(from your IdP)*                                          |
-| Scopes             | `openid profile email`                                     |
+| Scopes             | `openid profile email groups`                              |
 | Role Claim Path    | `groups`                                                   |
 | Username Claim     | `preferred_username`                                       |
 | Picture Claim      | `picture`                                                  |
@@ -67,6 +67,8 @@ Go to **Admin Dashboard > Plugins > OIDC RBAC > Providers tab**
 | Server Base URL    | *(optional, e.g. `https://jellyfin.example.com`)*          |
 
 > **Server Base URL** is only needed if Jellyfin can't resolve its public URL on its own (e.g. behind a reverse proxy whose `X-Forwarded-*` headers aren't trusted). See [Reverse proxy / redirect_uri](#reverse-proxy--redirect_uri).
+
+You may also need to put the appropriate role path in the scope. See [Supported Claim Paths](#supported-claim-paths).
 
 ### Profile image sync
 
