@@ -127,6 +127,18 @@ Also it is recommendable that you create a backup-admin user with password login
 * If your provider is down, you can still log in
 * If you mess up the roles, your main administrator account will get downgraded to a normal user. If this happens, try this [fix](https://jellyfin.org/docs/general/administration/troubleshooting/#unlock-locked-user-account).
 
+## Hiding Password Login
+
+There is no easy way to disable password login in jellyfin. It's a core function.
+But hiding the button in the web interface is easy.
+Go to **Admin Dashboard > General > Branding > Custom CSS code** and paste:
+
+```css
+form.manualLoginForm, button.btnForgotPassword {
+  display: none !important;
+}
+```
+
 ## How It Works
 
 ```
