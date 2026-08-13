@@ -203,15 +203,19 @@ public class OidcController : ControllerBase
             return BadRequest("Token validation failed: nonce mismatch");
         }
 
+        // The subject is what the Jellyfin account is keyed on, so it is mandatory. It is always
+        // present in a spec-compliant ID token; the validation above would have rejected one
+        // that was not signed by the provider.
+        var subject = ClaimParser.ExtractClaim(idToken, "sub");
+        if (string.IsNullOrEmpty(subject))
+        {
+            return BadRequest("Identity provider did not return a subject claim");
+        }
+
         var username = ClaimParser.ExtractClaim(idToken, provider.UsernameClaim);
         if (string.IsNullOrEmpty(username))
         {
-            username = ClaimParser.ExtractClaim(idToken, "sub");
-        }
-
-        if (string.IsNullOrEmpty(username))
-        {
-            return BadRequest("Could not determine username from token");
+            username = subject;
         }
 
         var displayName = ClaimParser.ExtractClaim(idToken, provider.DisplayNameClaim);
@@ -275,12 +279,15 @@ public class OidcController : ControllerBase
                 string.IsNullOrEmpty(pictureUrl) ? "not found in token or userinfo" : pictureUrl);
         }
 
-        _logger.LogInformation("OIDC auth successful: user={Username}, roles=[{Roles}], provider={Provider}",
-            username, string.Join(", ", roles), providerId);
+        _logger.LogInformation(
+            "OIDC auth successful: subject={Subject}, user={Username}, roles=[{Roles}], provider={Provider}",
+            subject, username, string.Join(", ", roles), providerId);
 
         var sessionToken = _stateManager.StoreAuthorizedSession(new AuthorizedSession
         {
             ProviderId = providerId,
+            Issuer = idToken.Issuer,
+            Subject = subject,
             Username = username,
             DisplayName = displayName,
             PictureUrl = string.IsNullOrEmpty(pictureUrl) ? null : pictureUrl,
@@ -314,8 +321,7 @@ public class OidcController : ControllerBase
         try
         {
             var userId = await _userSyncService.SyncUserAsync(
-                session.Username,
-                session.DisplayName,
+                ToIdentity(session),
                 session.Roles,
                 session.PictureUrl).ConfigureAwait(false);
 
@@ -382,8 +388,7 @@ public class OidcController : ControllerBase
         try
         {
             userId = await _userSyncService.SyncUserAsync(
-                session.Username,
-                session.DisplayName,
+                ToIdentity(session),
                 session.Roles,
                 session.PictureUrl).ConfigureAwait(false);
         }
@@ -472,6 +477,18 @@ public class OidcController : ControllerBase
                 provider.ProviderId);
             return null;
         }
+    }
+
+    private static OidcIdentity ToIdentity(AuthorizedSession session)
+    {
+        return new OidcIdentity
+        {
+            ProviderId = session.ProviderId,
+            Issuer = session.Issuer,
+            Subject = session.Subject,
+            Username = session.Username,
+            DisplayName = session.DisplayName
+        };
     }
 
     private OidcProviderConfig? GetProvider(string providerId)

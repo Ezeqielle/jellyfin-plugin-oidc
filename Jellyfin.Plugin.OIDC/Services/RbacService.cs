@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Data;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.OIDC.Configuration;
 using MediaBrowser.Controller.Library;
@@ -15,25 +16,24 @@ public class RbacService
 {
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly IConfigurationStore _configurationStore;
     private readonly ILogger<RbacService> _logger;
 
     public RbacService(
         IUserManager userManager,
         ILibraryManager libraryManager,
+        IConfigurationStore configurationStore,
         ILogger<RbacService> logger)
     {
         _userManager = userManager;
         _libraryManager = libraryManager;
+        _configurationStore = configurationStore;
         _logger = logger;
     }
 
     public async Task ApplyRoleMappingsAsync(Guid userId, string[] userRoles)
     {
-        var config = OidcPlugin.Instance?.Configuration;
-        if (config == null)
-        {
-            return;
-        }
+        var config = _configurationStore.Get();
 
         var user = _userManager.GetUserById(userId);
         if (user == null)
@@ -47,9 +47,6 @@ public class RbacService
         // and silently drops Permission/Preference changes (admin flag, enabled folders, ...),
         // which would leave users on Jellyfin's permissive default (access to all libraries).
         var policy = _userManager.GetUserDto(user).Policy;
-
-        // OIDC-authenticated users are always enabled on login.
-        policy.IsDisabled = false;
 
         var matchedMappings = config.RoleMappings
             .Where(m => userRoles.Contains(m.RoleName, StringComparer.OrdinalIgnoreCase))
@@ -68,11 +65,24 @@ public class RbacService
 
         if (matchedMappings.Count == 0)
         {
-            _logger.LogInformation("No role mappings matched for user {Username} with roles [{Roles}]; leaving permissions unchanged",
+            // Nothing vouches for this user any more. Returning here — which is what the code
+            // used to do — would leave the policy untouched, so a user who lost their admin role
+            // at the IdP would stay an administrator in Jellyfin indefinitely. Revoking admin is
+            // the part that has to happen; the rest of their permissions are left alone so a
+            // misconfigured mapping locks nobody out of their media.
+            _logger.LogWarning(
+                "No role mappings matched for user {Username} with roles [{Roles}]; revoking administrator",
                 user.Username, string.Join(", ", userRoles));
+
+            policy.IsAdministrator = false;
             await _userManager.UpdatePolicyAsync(userId, policy).ConfigureAwait(false);
             return;
         }
+
+        // A mapping matched, so the IdP still vouches for this user: an account disabled in the
+        // Jellyfin UI is re-enabled here. Note this is only reached on a match — an unmapped
+        // login above leaves IsDisabled alone, so disabling someone is not undone by SSO.
+        policy.IsDisabled = false;
 
         var merged = MergeMappings(matchedMappings);
 

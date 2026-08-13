@@ -2,51 +2,59 @@ using System;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Plugin.OIDC.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.OIDC.Services;
 
+/// <summary>
+/// An authenticated identity as asserted by the provider's ID token.
+/// </summary>
+public sealed class OidcIdentity
+{
+    public required string ProviderId { get; init; }
+
+    /// <summary>The `iss` claim — scopes <see cref="Subject"/> to one identity provider.</summary>
+    public required string Issuer { get; init; }
+
+    /// <summary>The `sub` claim — stable and unique within the issuer.</summary>
+    public required string Subject { get; init; }
+
+    /// <summary>
+    /// From the configured username claim. Used to name a newly created account and to find an
+    /// existing one on a first login; never used to identify an already-linked account.
+    /// </summary>
+    public required string Username { get; init; }
+
+    public string? DisplayName { get; init; }
+}
+
 public class UserSyncService
 {
     private readonly IUserManager _userManager;
+    private readonly UserResolver _userResolver;
     private readonly RbacService _rbacService;
     private readonly ProfileImageService _profileImageService;
     private readonly ILogger<UserSyncService> _logger;
 
     public UserSyncService(
         IUserManager userManager,
+        UserResolver userResolver,
         RbacService rbacService,
         ProfileImageService profileImageService,
         ILogger<UserSyncService> logger)
     {
         _userManager = userManager;
+        _userResolver = userResolver;
         _rbacService = rbacService;
         _profileImageService = profileImageService;
         _logger = logger;
     }
 
-    public async Task<Guid> SyncUserAsync(string username, string? displayName, string[] roles, string? pictureUrl)
+    public async Task<Guid> SyncUserAsync(OidcIdentity identity, string[] roles, string? pictureUrl)
     {
-        var user = _userManager.GetUserByName(username);
-        var isNewUser = user == null;
-
-        if (user == null)
-        {
-            var config = OidcPlugin.Instance?.Configuration;
-            if (config?.AutoCreateUsers != true)
-            {
-                throw new InvalidOperationException(
-                    $"User '{username}' does not exist and auto-creation is disabled");
-            }
-
-            user = await _userManager.CreateUserAsync(username).ConfigureAwait(false);
-
-            var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            await _userManager.ChangePassword(user.Id, randomPassword).ConfigureAwait(false);
-
-            _logger.LogInformation("Created new OIDC user: {Username}", username);
-        }
+        var (user, isNewUser) = await _userResolver.ResolveUserAsync(identity).ConfigureAwait(false);
 
         var userId = user.Id;
 
@@ -63,8 +71,8 @@ public class UserSyncService
                 .ConfigureAwait(false);
         }
 
-        // RBAC applies permissions/library access and re-enables the account, persisting via
-        // UpdatePolicyAsync (the only path that saves Permission/Preference changes).
+        // RBAC applies permissions/library access, persisting via UpdatePolicyAsync (the only
+        // path that saves Permission/Preference changes).
         await _rbacService.ApplyRoleMappingsAsync(userId, roles).ConfigureAwait(false);
         await _profileImageService.ApplyProfileImageAsync(userId, pictureUrl).ConfigureAwait(false);
 

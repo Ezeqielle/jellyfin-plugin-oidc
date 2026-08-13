@@ -13,6 +13,13 @@ public class ServiceRegistrator : IPluginServiceRegistrator
 
         // Singleton so discovery documents and JWKS stay cached across logins.
         serviceCollection.AddSingleton<TokenValidator>();
+
+        serviceCollection.AddSingleton<IConfigurationStore, PluginConfigurationStore>();
+
+        // Singleton so its write lock actually serialises concurrent link writes.
+        serviceCollection.AddSingleton<UserLinkStore>();
+
+        serviceCollection.AddScoped<UserResolver>();
         serviceCollection.AddScoped<RbacService>();
         serviceCollection.AddScoped<ProfileImageService>();
         serviceCollection.AddScoped<UserSyncService>();

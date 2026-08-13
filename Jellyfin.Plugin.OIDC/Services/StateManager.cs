@@ -26,6 +26,13 @@ public sealed class OidcState
 public sealed class AuthorizedSession
 {
     public required string ProviderId { get; init; }
+
+    /// <summary>Issuer of the ID token this session was established from.</summary>
+    public required string Issuer { get; init; }
+
+    /// <summary>The `sub` claim — what the Jellyfin account is actually keyed on.</summary>
+    public required string Subject { get; init; }
+
     public required string Username { get; init; }
     public string? DisplayName { get; init; }
     public string? PictureUrl { get; init; }

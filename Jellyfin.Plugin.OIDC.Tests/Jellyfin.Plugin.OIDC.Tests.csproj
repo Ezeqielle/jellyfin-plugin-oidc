@@ -9,8 +9,16 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The plugin excludes these at runtime because the Jellyfin host supplies them. Tests have
+         no host, so reference them normally to get the assemblies copied to the test output. -->
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.10" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.10" />
   </ItemGroup>
 
   <ItemGroup>
