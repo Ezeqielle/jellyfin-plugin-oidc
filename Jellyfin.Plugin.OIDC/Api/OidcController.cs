@@ -28,6 +28,7 @@ namespace Jellyfin.Plugin.OIDC.Api;
 public class OidcController : ControllerBase
 {
     private readonly StateManager _stateManager;
+    private readonly TokenValidator _tokenValidator;
     private readonly UserSyncService _userSyncService;
     private readonly ISessionManager _sessionManager;
     private readonly IQuickConnect _quickConnect;
@@ -37,6 +38,7 @@ public class OidcController : ControllerBase
 
     public OidcController(
         StateManager stateManager,
+        TokenValidator tokenValidator,
         UserSyncService userSyncService,
         ISessionManager sessionManager,
         IQuickConnect quickConnect,
@@ -45,6 +47,7 @@ public class OidcController : ControllerBase
         ILogger<OidcController> logger)
     {
         _stateManager = stateManager;
+        _tokenValidator = tokenValidator;
         _userSyncService = userSyncService;
         _sessionManager = sessionManager;
         _quickConnect = quickConnect;
@@ -167,18 +170,36 @@ public class OidcController : ControllerBase
             return BadRequest("Token exchange failed. Check plugin logs for details.");
         }
 
-        var handler = new JwtSecurityTokenHandler();
-        if (!handler.CanReadToken(tokenResponse.IdentityToken ?? tokenResponse.AccessToken))
+        // Identity comes from the ID token and nothing else. An access token is opaque to us by
+        // contract, so falling back to it when the provider returns no id_token would mean
+        // deriving a Jellyfin account from a blob we have no standing to interpret.
+        if (string.IsNullOrEmpty(tokenResponse.IdentityToken))
         {
-            return BadRequest("Could not read identity token");
+            _logger.LogError(
+                "Provider {Provider} returned no id_token. Ensure the 'openid' scope is requested and the client is an OIDC (not plain OAuth2) client.",
+                providerId);
+            return BadRequest("Identity provider did not return an ID token");
         }
 
-        var idToken = handler.ReadJwtToken(tokenResponse.IdentityToken ?? tokenResponse.AccessToken);
-
-        var nonceClaim = idToken.Claims.FirstOrDefault(c => c.Type == "nonce")?.Value;
-        if (!string.IsNullOrEmpty(oidcState.Nonce) && nonceClaim != oidcState.Nonce)
+        JwtSecurityToken idToken;
+        try
         {
-            _logger.LogWarning("Nonce mismatch in OIDC callback");
+            idToken = await _tokenValidator
+                .ValidateIdTokenAsync(provider, tokenResponse.IdentityToken, HttpContext.RequestAborted)
+                .ConfigureAwait(false);
+        }
+        catch (TokenValidationFailedException ex)
+        {
+            _logger.LogError(ex, "ID token validation failed for provider {Provider}", providerId);
+            return BadRequest("Token validation failed. Check plugin logs for details.");
+        }
+
+        // The nonce binds this token to the authorize request we started, so it must be present
+        // and match — an ID token replayed from another login attempt is not acceptable here.
+        var nonceClaim = idToken.Claims.FirstOrDefault(c => c.Type == "nonce")?.Value;
+        if (!string.Equals(nonceClaim, oidcState.Nonce, StringComparison.Ordinal))
+        {
+            _logger.LogWarning("Nonce mismatch in OIDC callback for provider {Provider}", providerId);
             return BadRequest("Token validation failed: nonce mismatch");
         }
 
@@ -195,14 +216,18 @@ public class OidcController : ControllerBase
 
         var displayName = ClaimParser.ExtractClaim(idToken, provider.DisplayNameClaim);
 
-        // Extract roles from both the ID token and the access token, then union them.
-        // Providers differ in which token carries which claims (e.g. an admin group may
-        // land only in the access token), so relying on one token can silently drop roles.
+        // Some providers put group/role claims only in the access token (Keycloak's
+        // realm_access.roles is the common case), so we read it too — but only after verifying
+        // its signature, issuer and expiry against the same provider. Audience is not checked:
+        // an access token is minted for a resource server, not for us. It contributes claims
+        // only; identity stays with the ID token above.
+        var accessTokenClaims = await ReadAccessTokenClaimsAsync(provider, tokenResponse.AccessToken)
+            .ConfigureAwait(false);
+
         var roles = ClaimParser.ExtractRoles(idToken, provider.RoleClaim);
-        if (handler.CanReadToken(tokenResponse.AccessToken))
+        if (accessTokenClaims != null)
         {
-            var accessToken = handler.ReadJwtToken(tokenResponse.AccessToken);
-            var accessRoles = ClaimParser.ExtractRoles(accessToken, provider.RoleClaim);
+            var accessRoles = ClaimParser.ExtractRoles(accessTokenClaims, provider.RoleClaim);
             roles = roles
                 .Concat(accessRoles)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -216,10 +241,9 @@ public class OidcController : ControllerBase
         if (provider.SyncProfileImage && !string.IsNullOrWhiteSpace(provider.PictureClaim))
         {
             pictureUrl = ClaimParser.ExtractClaim(idToken, provider.PictureClaim);
-            if (string.IsNullOrEmpty(pictureUrl) && handler.CanReadToken(tokenResponse.AccessToken))
+            if (string.IsNullOrEmpty(pictureUrl) && accessTokenClaims != null)
             {
-                pictureUrl = ClaimParser.ExtractClaim(
-                    handler.ReadJwtToken(tokenResponse.AccessToken), provider.PictureClaim);
+                pictureUrl = ClaimParser.ExtractClaim(accessTokenClaims, provider.PictureClaim);
             }
 
             // Many providers (e.g. Authentik) expose the picture only via the userinfo
@@ -417,6 +441,37 @@ public class OidcController : ControllerBase
             });
 
         return Ok(providers);
+    }
+
+    /// <summary>
+    /// Returns the validated claims of the access token, or null when there are none to be had.
+    /// Opaque (non-JWT) access tokens are normal and are skipped quietly; a JWT that fails
+    /// validation is dropped with a warning rather than trusted, so a bad token costs the user
+    /// their role claims instead of granting them.
+    /// </summary>
+    private async Task<JwtSecurityToken?> ReadAccessTokenClaimsAsync(
+        OidcProviderConfig provider,
+        string? accessToken)
+    {
+        if (string.IsNullOrEmpty(accessToken) || !new JwtSecurityTokenHandler().CanReadToken(accessToken))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _tokenValidator
+                .ValidateAccessTokenForClaimsAsync(provider, accessToken, HttpContext.RequestAborted)
+                .ConfigureAwait(false);
+        }
+        catch (TokenValidationFailedException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Access token from provider {Provider} failed validation; ignoring its claims",
+                provider.ProviderId);
+            return null;
+        }
     }
 
     private OidcProviderConfig? GetProvider(string providerId)

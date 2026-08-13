@@ -10,6 +10,9 @@ public class ServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddSingleton<StateManager>();
         serviceCollection.AddHostedService(sp => sp.GetRequiredService<StateManager>());
+
+        // Singleton so discovery documents and JWKS stay cached across logins.
+        serviceCollection.AddSingleton<TokenValidator>();
         serviceCollection.AddScoped<RbacService>();
         serviceCollection.AddScoped<ProfileImageService>();
         serviceCollection.AddScoped<UserSyncService>();
