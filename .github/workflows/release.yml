@@ -21,7 +21,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Extract version from tag
         id: version
@@ -73,7 +73,7 @@ jobs:
           jq -n \
             --arg version "${VERSION}.0" \
             --arg changelog "$CHANGELOG" \
-            --arg targetAbi "10.11.0.0" \
+            --arg targetAbi "12.0.0.0" \
             --arg sourceUrl "$DOWNLOAD_URL" \
             --arg checksum "$CHECKSUM" \
             --arg timestamp "$TIMESTAMP" \

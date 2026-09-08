@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.OIDC</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.OIDC</AssemblyName>
     <Nullable>enable</Nullable>
@@ -14,10 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.10">
+    <PackageReference Include="Jellyfin.Controller" Version="12.0.*-*">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.10">
+    <PackageReference Include="Jellyfin.Model" Version="12.0.*-*">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="IdentityModel" Version="7.0.0" />
