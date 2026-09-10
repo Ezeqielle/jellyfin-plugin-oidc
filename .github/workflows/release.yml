@@ -120,7 +120,17 @@ jobs:
           fi
           git commit -m "Update manifest.json for ${GITHUB_REF_NAME}"
           git push -f origin "$BRANCH"
+
+          # Check for an existing PR explicitly rather than swallowing every `gh pr create`
+          # failure with `|| echo`. That fallback once reported "PR already exists" when the
+          # real error was "GitHub Actions is not permitted to create or approve pull
+          # requests" — the job went green while the catalog was never updated, so a release
+          # looked shipped and reached nobody.
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            echo "PR already exists for $BRANCH; branch updated in place"
+            exit 0
+          fi
+
           gh pr create --base main --head "$BRANCH" \
             --title "Update manifest.json for ${GITHUB_REF_NAME}" \
-            --body "Automated manifest bump for the ${GITHUB_REF_NAME} release. Merge to publish it to the plugin catalog." \
-            || echo "PR already exists for $BRANCH; branch updated in place"
+            --body "Automated manifest bump for the ${GITHUB_REF_NAME} release. Merge to publish it to the plugin catalog."

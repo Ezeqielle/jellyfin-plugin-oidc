@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Jellyfin.Plugin.OIDC.Configuration;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.OIDC.Api;
@@ -23,6 +25,19 @@ public class LoginButtonController : ControllerBase
             return Content("", "application/javascript");
         }
 
+        return Content(BuildScript(providers), "application/javascript");
+    }
+
+    /// <summary>
+    /// Builds the injected login-button script.
+    ///
+    /// Internal so the test suite can render it without a running host: this is assembled from
+    /// string fragments, so nothing in the C# build checks that the result is valid JavaScript,
+    /// and a syntax error here silently removes every SSO button from the login page rather
+    /// than failing loudly. CI runs `node --check` over the rendered output.
+    /// </summary>
+    internal static string BuildScript(IReadOnlyList<OidcProviderConfig> providers)
+    {
         var sb = new StringBuilder();
         sb.AppendLine("(function() {");
         // Jellyfin may run under a base path (Networking > Base URL). The web client is served
@@ -69,7 +84,7 @@ public class LoginButtonController : ControllerBase
         sb.AppendLine("  setTimeout(function () { observer.disconnect(); }, 30000);");
         sb.AppendLine("})();");
 
-        return Content(sb.ToString(), "application/javascript");
+        return sb.ToString();
     }
 
     [HttpGet("BrandingSnippet")]
