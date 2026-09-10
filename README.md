@@ -163,9 +163,37 @@ Browser                    Jellyfin Plugin              Identity Provider
 2. Plugin redirects to the IdP's authorization endpoint (with PKCE)
 3. User authenticates at the IdP
 4. IdP redirects back with an authorization code
-5. Plugin exchanges the code for tokens, extracts roles from the configured claim path
-6. Plugin creates/updates the Jellyfin user and applies role-based permissions
-7. Plugin issues a Jellyfin session token and redirects to the dashboard
+5. Plugin exchanges the code for tokens and validates the ID token
+6. Plugin extracts roles from the configured claim path
+7. Plugin creates/updates the Jellyfin user and applies role-based permissions
+8. Plugin issues a Jellyfin session token and redirects to the dashboard
+
+### Token validation
+
+The ID token is verified against the signing keys published at the provider's JWKS endpoint
+before any of its claims are used:
+
+| Check | Enforced |
+| --- | --- |
+| Signature (RSA/ECDSA only — `none` and HMAC rejected) | Yes |
+| Issuer matches the discovery document | Yes |
+| Audience matches the configured Client ID | Yes |
+| Expiry (2 minute clock skew allowance) | Yes |
+| `nonce` matches the authorize request | Yes |
+
+Discovery documents and signing keys are cached per provider and refreshed automatically, so
+logins do not add round trips to the IdP. Key rotation is handled: a token signed by an unknown
+key triggers one JWKS refresh and retry before the login fails.
+
+A provider that returns no `id_token` is rejected. If you see this, the client is likely
+configured as a plain OAuth2 client, or the `openid` scope is missing from the Scopes field.
+
+Access tokens are also read, since some providers place group/role claims only there (Keycloak's
+`realm_access.roles` is the common case). They are signature-, issuer- and expiry-checked the same
+way; only the audience check is skipped, because an access token is minted for a resource server
+rather than for Jellyfin. An access token that fails validation is ignored rather than trusted —
+the affected user loses their role claims rather than gaining any. Identity itself always comes
+from the ID token.
 
 ## Mobile & native apps (Quick Connect)
 
@@ -294,6 +322,12 @@ make build
 make docker-build
 ```
 
+### Test
+
+```bash
+dotnet test jellyfin-plugin-oidc.sln
+```
+
 ### Package (installable zip)
 
 ```bash
@@ -325,10 +359,14 @@ Jellyfin.Plugin.OIDC/
     OidcAuthProvider.cs          # Blocks password login for SSO users
   Services/
     StateManager.cs              # Thread-safe OIDC state with TTL
+    TokenValidator.cs            # JWKS-backed ID/access token validation
     ClaimParser.cs               # JWT claim extraction (nested paths)
     RbacService.cs               # Role-to-permission mapping engine
     UserSyncService.cs           # User provisioning and sync
+    ProfileImageService.cs       # Avatar sync from the picture claim
     ServiceRegistrator.cs        # DI registration
+Jellyfin.Plugin.OIDC.Tests/
+  TokenValidatorTests.cs         # Token forgery / misdirection rejection tests
 ```
 
 ## License
