@@ -7,6 +7,13 @@
   "category": "Authentication",
   "versions": [
     {
+      "version": "1.0.10.0",
+      "changelog": "Fix the SSO sign-in banner appearing on media item pages. The injected login-button script matched any form on any page, so the banner rendered above the audio/subtitle selectors on movie and episode pages. It now attaches only to the login form, inserts the buttons once, and stops watching the DOM afterwards. Thanks to @brianporeilly for the report and the fix",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-09-10T00:00:00Z"
+    },
+    {
       "version": "1.0.9.0",
       "changelog": "UPGRADE NOTE: logins will now fail for providers that return no id_token (a plain OAuth2 client rather than OIDC) or that sign ID tokens with HS256; the reason is written to the Jellyfin server log. Providers that return an id_token signed with RS256/ECDSA — the default nearly everywhere — are unaffected. Validate ID tokens cryptographically before trusting their claims: signature against the provider's published JWKS keys (RSA/ECDSA only), issuer, audience (your Client ID) and expiry, with automatic key-rotation handling. Previously tokens were only base64-decoded, so a token minted for a different client in the same realm, or an expired one, was accepted — and those claims drive account provisioning and the administrator flag. Access tokens are now verified before roles or picture claims are read from them, and a provider returning no id_token fails the login instead of silently falling back to the access token. Adds the project's first test suite and a CI workflow",
       "targetAbi": "10.11.0.0",
