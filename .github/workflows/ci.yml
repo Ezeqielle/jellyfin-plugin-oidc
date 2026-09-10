@@ -21,3 +21,16 @@ jobs:
 
       - name: Test
         run: dotnet test jellyfin-plugin-oidc.sln -c Release --no-build
+
+      # The login-button script is built by string concatenation, so the C# compiler never
+      # sees the JavaScript. Parse the rendered output with a real engine — a syntax error
+      # here removes every SSO button from the login page without logging anything.
+      - name: Check generated login-button script parses
+        run: |
+          SCRIPT=$(find . -name 'login-buttons.generated.js' -path '*/bin/*' | head -1)
+          if [ -z "$SCRIPT" ]; then
+            echo "::error::No rendered script found. Did LoginButtonScriptTests run?"
+            exit 1
+          fi
+          echo "Checking $SCRIPT"
+          node --check "$SCRIPT"
