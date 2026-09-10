@@ -30,7 +30,7 @@ public class LoginButtonController : ControllerBase
         sb.AppendLine("  var _p = window.location.pathname.split('/web/');");
         sb.AppendLine("  var basePath = _p.length > 1 ? _p[0] : '';");
         sb.AppendLine("  function addButtons() {");
-        sb.AppendLine("    var form = document.querySelector('.manualLoginForm, #loginPage form, [data-role=\"page\"] form');");
+        sb.AppendLine("    var form = document.querySelector('.manualLoginForm, #loginPage form');");
         sb.AppendLine("    if (!form || document.getElementById('oidc-sso-buttons')) return;");
         sb.AppendLine("    var container = document.createElement('div');");
         sb.AppendLine("    container.id = 'oidc-sso-buttons';");
