@@ -7,6 +7,13 @@
   "category": "Authentication",
   "versions": [
     {
+      "version": "1.0.9.0",
+      "changelog": "Validate ID tokens cryptographically before trusting their claims: signature against the provider's published JWKS keys (RSA/ECDSA only), issuer, audience (your Client ID) and expiry, with automatic key-rotation handling. Previously tokens were only base64-decoded, so a token minted for a different client in the same realm, or an expired one, was accepted — and those claims drive account provisioning and the administrator flag. Access tokens are now verified before roles or picture claims are read from them, and a provider returning no id_token fails the login instead of silently falling back to the access token. Adds the project's first test suite and a CI workflow",
+      "targetAbi": "10.11.0.0",
+      "sourceUrl": "",
+      "timestamp": "2026-09-10T00:00:00Z"
+    },
+    {
       "version": "1.0.8.0",
       "changelog": "Add native/mobile app SSO via Jellyfin Quick Connect: authenticate in a browser, then enter the code shown by your Android/iOS/TV app (the web login button only works in the browser client). Fix SSO links not honoring a Jellyfin base URL (Networking > Base URL) — the callback previously redirected to /sso/OIDC/Auth without the prefix and 404'd on prefixed deployments",
       "targetAbi": "10.11.0.0",
