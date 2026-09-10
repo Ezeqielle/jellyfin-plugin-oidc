@@ -29,7 +29,7 @@ public class LoginButtonController : ControllerBase
         // under '<basePath>/web/', so derive the prefix from the login page URL. Empty when unset.
         sb.AppendLine("  var _p = window.location.pathname.split('/web/');");
         sb.AppendLine("  var basePath = _p.length > 1 ? _p[0] : '';");
-        sb.AppendLine("  var observer = new MutationObserver(function(mutations, obs) {");
+        sb.AppendLine("  function addButtons() {");
         sb.AppendLine("    var form = document.querySelector('.manualLoginForm, #loginPage form');");
         sb.AppendLine("    if (!form || document.getElementById('oidc-sso-buttons')) return;");
         sb.AppendLine("    var container = document.createElement('div');");
@@ -60,13 +60,13 @@ public class LoginButtonController : ControllerBase
         sb.AppendLine("    container.appendChild(sep);");
         sb.AppendLine("    form.parentNode.insertBefore(container, form);");
         // Stop listening for mutations.
-        sb.AppendLine("    obs.disconnect();");
+        sb.AppendLine("    observer.disconnect();");
         sb.AppendLine("  }");
+        ab.AppendLine("  var observer = new MutationObserver(addButtons);");
         sb.AppendLine("  observer.observe(document.body, { childList: true, subtree: true });");
         // Safety fallback: stop observing after 30 seconds if no login form appears
-        sb.AppendLine("  setTimeout(function() {");
-        sb.AppendLine("    observer.disconnect();");
-        sb.AppendLine("  }, 30000);");
+        sb.AppendLine("  addButtons();");
+        sb.AppendLine("  setTimeout(function () { observer.disconnect(); }, 30000);");
         sb.AppendLine("})();");
 
         return Content(sb.ToString(), "application/javascript");
