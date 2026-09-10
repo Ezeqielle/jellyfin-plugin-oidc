@@ -62,10 +62,10 @@ public class LoginButtonController : ControllerBase
         // Stop listening for mutations.
         sb.AppendLine("    observer.disconnect();");
         sb.AppendLine("  }");
-        ab.AppendLine("  var observer = new MutationObserver(addButtons);");
+        sb.AppendLine("  var observer = new MutationObserver(addButtons);");
         sb.AppendLine("  observer.observe(document.body, { childList: true, subtree: true });");
-        // Safety fallback: stop observing after 30 seconds if no login form appears
         sb.AppendLine("  addButtons();");
+        // Safety fallback: stop observing after 30 seconds if no login form appears
         sb.AppendLine("  setTimeout(function () { observer.disconnect(); }, 30000);");
         sb.AppendLine("})();");
 
